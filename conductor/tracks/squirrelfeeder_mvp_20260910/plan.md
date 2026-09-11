@@ -36,20 +36,20 @@ Follow the Conductor TDD workflow: write failing unit/mock tests (Red), implemen
 - [x] Task: Phase Verification & Checkpoint (Refer to workflow.md)
 
 ## Phase 3: Pi Zero W Camera Pipeline & Lifecycle Daemon
-- [ ] Task: Write Tests for Camera Pipeline Wrapper
-    - [ ] Write unit tests for camera capture parameter generation (1080p, 30fps, 20s, MP4)
-    - [ ] Write unit tests for handling camera hardware errors
-    - [ ] Verify tests fail (Red)
-- [ ] Task: Implement Camera Service Module
-    - [ ] Implement libcamera-vid / rpicam-vid subprocess wrapper targeting MP4 output
-    - [ ] Verify camera service passes unit tests (Green)
-- [ ] Task: Write Tests & Implementation for Watchdog GPIO Handshake
-    - [ ] Write unit tests for GPIO 25 pin assertion
-    - [ ] Implement GPIO 25 active-HIGH pulse to acknowledge shutdown to Nano
-- [ ] Task: Implement Master Orchestrator Script
-    - [ ] Chain sequence: Mount Storage -> Record Video -> Sync Disk -> Signal ACK -> OS Poweroff
-    - [ ] Verify orchestrator end-to-end flow with mocked hardware
-- [ ] Task: Phase Verification & Checkpoint (Refer to workflow.md)
+- [x] Task: Write Tests for Camera Pipeline Wrapper
+    - [x] Write unit tests for camera capture parameter generation (1080p, 30fps, 20s, MP4)
+    - [x] Write unit tests for handling camera hardware errors
+    - [x] Verify tests fail (Red)
+- [x] Task: Implement Camera Service Module
+    - [x] Implement libcamera-vid / rpicam-vid subprocess wrapper targeting MP4 output
+    - [x] Verify camera service passes unit tests (Green)
+- [x] Task: Write Tests & Implementation for Watchdog GPIO Handshake
+    - [x] Write unit tests for GPIO 25 pin assertion
+    - [x] Implement GPIO 25 active-HIGH pulse to acknowledge shutdown to Nano
+- [x] Task: Implement Master Orchestrator Script
+    - [x] Chain sequence: Mount Storage -> Record Video -> Sync Disk -> Signal ACK -> OS Poweroff
+    - [x] Verify orchestrator end-to-end flow with mocked hardware
+- [~] Task: Phase Verification & Checkpoint (Refer to workflow.md)
 
 ## Phase 4: OS Optimization, Systemd Automation, & Integration
 - [ ] Task: Create Fast-Boot Systemd Service
