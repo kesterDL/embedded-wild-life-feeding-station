@@ -33,7 +33,7 @@ Follow the Conductor TDD workflow: write failing unit/mock tests (Red), implemen
 - [x] Task: Write Tests & Implementation for File Naming & Directory Structure
     - [x] Write unit tests for timestamped filename generation (e.g., clip_YYYYMMDD_HHMMSS.mp4)
     - [x] Implement filename formatting and output directory creation (/mnt/usb_storage/videos/)
-- [~] Task: Phase Verification & Checkpoint (Refer to workflow.md)
+- [x] Task: Phase Verification & Checkpoint (Refer to workflow.md)
 
 ## Phase 3: Pi Zero W Camera Pipeline & Lifecycle Daemon
 - [ ] Task: Write Tests for Camera Pipeline Wrapper
