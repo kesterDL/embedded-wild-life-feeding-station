@@ -18,7 +18,7 @@ Follow the Conductor TDD workflow: write failing unit/mock tests (Red), implemen
     - [x] Implement software/hardware timer tracking elapsed time in WAIT_SHUTDOWN state
     - [x] Enforce power cutoff if ACK is not received within 60,000 ms
     - [x] Implement 5,000 ms delay post-ACK before releasing D8 to ensure clean Linux OS halt
-- [~] Task: Phase Verification & Checkpoint (Refer to workflow.md)
+- [x] Task: Phase Verification & Checkpoint (Refer to workflow.md)
 
 ## Phase 2: Pi Zero W Storage Manager & Fault Handling
 - [ ] Task: Write Tests for USB Drive Detection & Mounting
