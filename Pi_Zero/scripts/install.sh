@@ -18,7 +18,8 @@ echo "=== Installing SquirrelFeeder Media Node ==="
 
 echo "[1/3] Copying files to ${INSTALL_DIR}..."
 mkdir -p "${INSTALL_DIR}"
-cp -r "$(dirname "$0")/../.." "${INSTALL_DIR}/" 2>/dev/null || true
+PROJECT_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+cp -r "${PROJECT_ROOT}/Pi_Zero" "${INSTALL_DIR}/"
 
 echo "[2/3] Installing systemd service..."
 cp "${SERVICE_SRC}" "${SERVICE_DEST}"
