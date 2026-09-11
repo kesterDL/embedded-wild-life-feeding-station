@@ -21,19 +21,19 @@ Follow the Conductor TDD workflow: write failing unit/mock tests (Red), implemen
 - [x] Task: Phase Verification & Checkpoint (Refer to workflow.md)
 
 ## Phase 2: Pi Zero W Storage Manager & Fault Handling
-- [ ] Task: Write Tests for USB Drive Detection & Mounting
-    - [ ] Write unit tests for identifying USB block device (/dev/sd*)
-    - [ ] Write unit tests for mount/unmount operations and missing-drive graceful abort
-    - [ ] Verify tests fail (Red)
-- [ ] Task: Implement Storage Manager Module
-    - [ ] Implement USB drive detection and mount to /mnt/usb_storage
-    - [ ] Implement fallback abort if USB drive is missing (preventing battery drain)
-    - [ ] Implement sync and clean unmount before signaling shutdown
-    - [ ] Verify tests pass (Green)
-- [ ] Task: Write Tests & Implementation for File Naming & Directory Structure
-    - [ ] Write unit tests for timestamped filename generation (e.g., clip_YYYYMMDD_HHMMSS.mp4)
-    - [ ] Implement filename formatting and output directory creation (/mnt/usb_storage/videos/)
-- [ ] Task: Phase Verification & Checkpoint (Refer to workflow.md)
+- [x] Task: Write Tests for USB Drive Detection & Mounting
+    - [x] Write unit tests for identifying USB block device (/dev/sd*)
+    - [x] Write unit tests for mount/unmount operations and missing-drive graceful abort
+    - [x] Verify tests fail (Red)
+- [x] Task: Implement Storage Manager Module
+    - [x] Implement USB drive detection and mount to /mnt/usb_storage
+    - [x] Implement fallback abort if USB drive is missing (preventing battery drain)
+    - [x] Implement sync and clean unmount before signaling shutdown
+    - [x] Verify tests pass (Green)
+- [x] Task: Write Tests & Implementation for File Naming & Directory Structure
+    - [x] Write unit tests for timestamped filename generation (e.g., clip_YYYYMMDD_HHMMSS.mp4)
+    - [x] Implement filename formatting and output directory creation (/mnt/usb_storage/videos/)
+- [~] Task: Phase Verification & Checkpoint (Refer to workflow.md)
 
 ## Phase 3: Pi Zero W Camera Pipeline & Lifecycle Daemon
 - [ ] Task: Write Tests for Camera Pipeline Wrapper
