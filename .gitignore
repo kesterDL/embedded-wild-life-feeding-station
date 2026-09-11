@@ -1,0 +1,21 @@
+# Build and Test Artifacts
+test_runner
+*.o
+*.a
+*.so
+*.dylib
+build/
+.pio/
+*.hex
+*.elf
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+
+# OS
+.DS_Store

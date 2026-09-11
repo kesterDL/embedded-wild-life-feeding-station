@@ -3,9 +3,9 @@
 Follow the Conductor TDD workflow: write failing unit/mock tests (Red), implement minimum code to pass (Green), refactor, and verify coverage (>80%).
 
 ## Phase 1: Arduino Nano Watchdog Firmware & Failsafe Timer
-- [ ] Task: Setup Firmware Test Harness & Mock Scaffolding
-    - [ ] Create unit test harness for Arduino state machine logic (simulating AVR pins, interrupts, and timers)
-    - [ ] Verify test harness executes and tests fail (Red)
+- [x] Task: Setup Firmware Test Harness & Mock Scaffolding
+    - [x] Create unit test harness for Arduino state machine logic (simulating AVR pins, interrupts, and timers)
+    - [x] Verify test harness executes and tests fail (Red)
 - [ ] Task: Implement FSM State Machine & Sleep Management
     - [ ] Implement core states: SLEEP, POWER_ON, WAIT_SHUTDOWN, POWER_OFF_DELAY
     - [ ] Implement AVR power management (ADCSRA disable, BOD disable, SLEEP_MODE_PWR_DOWN)
