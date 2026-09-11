@@ -6,19 +6,19 @@ Follow the Conductor TDD workflow: write failing unit/mock tests (Red), implemen
 - [x] Task: Setup Firmware Test Harness & Mock Scaffolding
     - [x] Create unit test harness for Arduino state machine logic (simulating AVR pins, interrupts, and timers)
     - [x] Verify test harness executes and tests fail (Red)
-- [ ] Task: Implement FSM State Machine & Sleep Management
-    - [ ] Implement core states: SLEEP, POWER_ON, WAIT_SHUTDOWN, POWER_OFF_DELAY
-    - [ ] Implement AVR power management (ADCSRA disable, BOD disable, SLEEP_MODE_PWR_DOWN)
-    - [ ] Verify state transitions pass test suite (Green)
-- [ ] Task: Implement Hardware Interrupt & Power Gate Switching
-    - [ ] Implement INT0 (D2) rising-edge ISR for PIR sensor trigger
-    - [ ] Implement D8 MOSFET gate control (Active LOW on wake, Active HIGH to cut)
-    - [ ] Implement D6 shutdown ACK pin polling/interrupt
-- [ ] Task: Implement 60-Second Failsafe Watchdog Timer
-    - [ ] Implement software/hardware timer tracking elapsed time in WAIT_SHUTDOWN state
-    - [ ] Enforce power cutoff if ACK is not received within 60,000 ms
-    - [ ] Implement 5,000 ms delay post-ACK before releasing D8 to ensure clean Linux OS halt
-- [ ] Task: Phase Verification & Checkpoint (Refer to workflow.md)
+- [x] Task: Implement FSM State Machine & Sleep Management
+    - [x] Implement core states: SLEEP, POWER_ON, WAIT_SHUTDOWN, POWER_OFF_DELAY
+    - [x] Implement AVR power management (ADCSRA disable, BOD disable, SLEEP_MODE_PWR_DOWN)
+    - [x] Verify state transitions pass test suite (Green)
+- [x] Task: Implement Hardware Interrupt & Power Gate Switching
+    - [x] Implement INT0 (D2) rising-edge ISR for PIR sensor trigger
+    - [x] Implement D8 MOSFET gate control (Active LOW on wake, Active HIGH to cut)
+    - [x] Implement D6 shutdown ACK pin polling/interrupt
+- [x] Task: Implement 60-Second Failsafe Watchdog Timer
+    - [x] Implement software/hardware timer tracking elapsed time in WAIT_SHUTDOWN state
+    - [x] Enforce power cutoff if ACK is not received within 60,000 ms
+    - [x] Implement 5,000 ms delay post-ACK before releasing D8 to ensure clean Linux OS halt
+- [~] Task: Phase Verification & Checkpoint (Refer to workflow.md)
 
 ## Phase 2: Pi Zero W Storage Manager & Fault Handling
 - [ ] Task: Write Tests for USB Drive Detection & Mounting
