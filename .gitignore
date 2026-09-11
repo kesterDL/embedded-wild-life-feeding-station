@@ -19,3 +19,6 @@ htmlcov/
 
 # OS
 .DS_Store
+test_cov*
+*.gcda
+*.gcno
