@@ -1,0 +1,17 @@
+[Unit]
+Description=Squirrel Feeder Edge Camera Recording Service
+DefaultDependencies=no
+After=local-fs.target sysinit.target systemd-modules-load.service
+Before=shutdown.target
+
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=/opt/squirrelfeeder
+ExecStart=/usr/bin/python3 -m Pi_Zero.src.orchestrator
+StandardOutput=journal+console
+StandardError=journal+console
+TimeoutSec=45
+
+[Install]
+WantedBy=basic.target

@@ -52,12 +52,12 @@ Follow the Conductor TDD workflow: write failing unit/mock tests (Red), implemen
 - [x] Task: Phase Verification & Checkpoint (Refer to workflow.md)
 
 ## Phase 4: OS Optimization, Systemd Automation, & Integration
-- [ ] Task: Create Fast-Boot Systemd Service
-    - [ ] Create squirrel-record.service unit file with dependencies and fast-boot ordering
-    - [ ] Add verification test for service syntax and execution permissions
-- [ ] Task: Create OS Boot Optimization Script
-    - [ ] Create script to disable HDMI (tvservice -o), Bluetooth, Wi-Fi, and non-essential services
-- [ ] Task: System Integration Verification
-    - [ ] Verify Arduino Nano .ino / PlatformIO compilation
-    - [ ] Verify full mock end-to-end execution of the Python media pipeline
-- [ ] Task: Phase Verification & Checkpoint (Refer to workflow.md)
+- [x] Task: Create Fast-Boot Systemd Service
+    - [x] Create squirrel-record.service unit file with dependencies and fast-boot ordering
+    - [x] Add verification test for service syntax and execution permissions
+- [x] Task: Create OS Boot Optimization Script
+    - [x] Create script to disable HDMI (tvservice -o), Bluetooth, Wi-Fi, and non-essential services
+- [x] Task: System Integration Verification
+    - [x] Verify Arduino Nano .ino / PlatformIO compilation
+    - [x] Verify full mock end-to-end execution of the Python media pipeline
+- [x] Task: Phase Verification & Checkpoint (Refer to workflow.md)
