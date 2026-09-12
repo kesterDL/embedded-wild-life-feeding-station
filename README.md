@@ -8,7 +8,7 @@
 An autonomous, battery-powered edge camera system engineered to monitor a backyard wildlife feeding station. The system balances ultra-low-power standby consumption with high-definition video capture by leveraging an asymmetric **Dual-Hardware Architecture**:
 
 - **Watchdog Node (Arduino Nano V3.0):** Sleeps continuously in `SLEEP_MODE_PWR_DOWN` (< 50 µA), wakes immediately on motion detected by an HC-SR501 PIR sensor, latches a high-side P-MOSFET to deliver 5V power to the Linux media node, and enforces a 60-second hardware failsafe timer.
-- **Media Node (Raspberry Pi Zero W):** Boots on demand, mounts a removable USB flash drive, captures a 20-second 1080p MP4 clip via CSI camera module, flushes filesystem buffers, pulses a GPIO shutdown acknowledgment to the Nano, and halts the OS cleanly before power is cut.
+- **Media Node (Raspberry Pi Zero W):** Boots on demand, mounts a removable USB flash drive, captures a 20-second 1080p @ 25 fps MP4 clip via CSI camera module, flushes filesystem buffers, pulses a GPIO shutdown acknowledgment to the Nano, and halts the OS cleanly before power is cut.
 
 ---
 
@@ -66,13 +66,15 @@ An autonomous, battery-powered edge camera system engineered to monitor a backya
 │   ├── scripts/
 │   │   ├── install.sh          # Deployment script for /opt/squirrelfeeder
 │   │   ├── optimize_os.sh      # OS boot latency and power optimizations
-│   │   └── squirrel-record.service # Systemd fast-boot oneshot unit
+│   │   ├── squirrel-record.service # Systemd fast-boot oneshot unit
+│   │   └── test_camera_integration.py # Standalone hardware camera integration test
 │   ├── src/
 │   │   ├── camera_service.py   # rpicam-vid / libcamera-vid wrapper
 │   │   ├── orchestrator.py     # Master boot-to-halt lifecycle daemon
 │   │   ├── storage_manager.py  # USB drive detection, mount, and sync
 │   │   └── watchdog_bridge.py  # GPIO 25 shutdown ACK signaling
 │   └── tests/
+│       ├── test_camera_integration.py
 │       ├── test_camera_service.py
 │       ├── test_orchestrator.py
 │       ├── test_storage_manager.py
@@ -140,6 +142,38 @@ You can simulate the complete media pipeline on your local development machine u
 python3 -m Pi_Zero.src.orchestrator --dry-run
 ```
 
+### 4. Hardware Camera Integration Test (Pi Zero W)
+
+To verify physical CSI camera hardware functionality on the Raspberry Pi Zero W without engaging the storage mounting or watchdog shutdown sequences, run the standalone integration test script:
+
+```bash
+# Standard 20-second test: Detects sensor, captures 20s 1080p @ 25 fps video, stops camera, verifies file
+python3 Pi_Zero/scripts/test_camera_integration.py
+
+# Optional: customize duration (in seconds) or output destination
+python3 Pi_Zero/scripts/test_camera_integration.py --duration 20 --output /tmp/test_clip.mp4
+
+# Check-only mode (validates sensor detection without recording)
+python3 Pi_Zero/scripts/test_camera_integration.py --check-only
+
+# Dry-run mode (validates workflow simulation on host machine)
+python3 Pi_Zero/scripts/test_camera_integration.py --dry-run
+```
+
+> [!TIP]
+> **Why 1080p @ 25 fps on the Pi Zero W?**
+> On Raspberry Pi OS (`libcamera` / `rpicam-vid`), camera pipeline and ISP processing run in user space on the Pi Zero's single-core 1.0 GHz ARM11 processor. At 1080p30, the single-core CPU operates near 100% saturation, which causes dropped frames from the sensor. Capping capture at **25 fps** reduces CPU overhead by ~20%, completely eliminating dropped frames and ensuring smooth, stutter-free playback.
+
+#### Smooth Playback & MP4 Containerization:
+- **On the Pi Zero:** `rpicam-vid` outputs raw H.264 elementary streams (`.h264`). To automatically package captures into standard ISO MP4 containers with constant PTS timestamps directly on the Pi Zero, install `MP4Box`:
+  ```bash
+  sudo apt update && sudo apt install -y gpac
+  ```
+- **On macOS (1-Click Fetch & Watch):** Use the included helper script on your Mac to pull the latest recording from the Pi, encapsulate it with uniform 25 fps timestamps via `ffmpeg`, and launch it directly in QuickTime Player:
+  ```bash
+  python3 scripts/fetch_and_watch.py
+  ```
+
 ---
 
 ## Using `Pi_Zero/scripts` (Deployment & Optimization)
@@ -176,8 +210,9 @@ sudo ./Pi_Zero/scripts/install.sh
 
 **What this script does:**
 1. Copies the `Pi_Zero` package to `/opt/squirrelfeeder/Pi_Zero`.
-2. Installs [`squirrel-record.service`](Pi_Zero/scripts/squirrel-record.service) to `/etc/systemd/system/squirrel-record.service`.
-3. Reloads the systemd daemon and enables the service to launch automatically upon boot.
+2. Installs `gpac` (`MP4Box`) for native MP4 container muxing.
+3. Installs [`squirrel-record.service`](Pi_Zero/scripts/squirrel-record.service) to `/etc/systemd/system/squirrel-record.service`.
+4. Reloads the systemd daemon and enables the service to launch automatically upon boot.
 
 ### Service Inspection & Troubleshooting
 

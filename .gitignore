@@ -22,3 +22,8 @@ htmlcov/
 test_cov*
 *.gcda
 *.gcno
+
+# Media & Test Video Artifacts
+*.h264
+*.mp4
+*.mkv

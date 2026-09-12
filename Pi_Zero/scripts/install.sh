@@ -16,16 +16,21 @@ SERVICE_DEST="/etc/systemd/system/squirrel-record.service"
 
 echo "=== Installing SquirrelFeeder Media Node ==="
 
-echo "[1/3] Copying files to ${INSTALL_DIR}..."
+echo "[1/4] Copying files to ${INSTALL_DIR}..."
 mkdir -p "${INSTALL_DIR}"
 PROJECT_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cp -r "${PROJECT_ROOT}/Pi_Zero" "${INSTALL_DIR}/"
 
-echo "[2/3] Installing systemd service..."
+echo "[2/4] Ensuring MP4Box (gpac) is installed for MP4 encapsulation..."
+if ! command -v MP4Box &>/dev/null; then
+  apt-get update && apt-get install -y --no-install-recommends gpac || echo "Warning: Could not install gpac. Raw .h264 fallback will be used."
+fi
+
+echo "[3/4] Installing systemd service..."
 cp "${SERVICE_SRC}" "${SERVICE_DEST}"
 chmod 644 "${SERVICE_DEST}"
 
-echo "[3/3] Enabling service..."
+echo "[4/4] Enabling service..."
 systemctl daemon-reload
 systemctl enable squirrel-record.service
 

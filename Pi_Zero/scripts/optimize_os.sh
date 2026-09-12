@@ -20,7 +20,7 @@ echo "[1/4] Masking unnecessary services..."
 SERVICES=(
   bluetooth.service
   hciuart.service
-  avahi-daemon.service
+  # avahi-daemon.service this service allows for ssh over usb. Keep active for now.
   triggerhappy.service
   ModemManager.service
   cups.service

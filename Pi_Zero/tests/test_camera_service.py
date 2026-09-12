@@ -9,9 +9,16 @@ class TestCameraService(unittest.TestCase):
         self.camera = CameraService(
             width=1920,
             height=1080,
-            fps=30,
+            fps=25,
             duration_ms=20000
         )
+
+    def test_default_initialization(self):
+        default_cam = CameraService()
+        self.assertEqual(default_cam.fps, 25)
+        self.assertEqual(default_cam.width, 1920)
+        self.assertEqual(default_cam.height, 1080)
+        self.assertEqual(default_cam.duration_ms, 20000)
 
     @patch("shutil.which")
     def test_resolve_binary_preference(self, mock_which):
@@ -38,26 +45,38 @@ class TestCameraService(unittest.TestCase):
             self.assertIn("--height", cmd)
             self.assertIn("1080", cmd)
             self.assertIn("--framerate", cmd)
-            self.assertIn("30", cmd)
+            self.assertIn("25", cmd)
             self.assertIn("-t", cmd)
             self.assertIn("20000", cmd)
             self.assertIn("-o", cmd)
             self.assertIn("/mnt/usb_storage/videos/clip_test.mp4", cmd)
 
+    @patch("shutil.which")
     @patch("subprocess.run")
-    def test_record_video_success(self, mock_run):
+    def test_record_video_success_without_muxer(self, mock_run, mock_which):
+        mock_which.side_effect = lambda cmd: "/usr/bin/rpicam-vid" if cmd == "rpicam-vid" else None
         mock_run.return_value = MagicMock(returncode=0)
-        with patch.object(self.camera, "resolve_binary", return_value="rpicam-vid"):
-            result = self.camera.record_video("/mnt/usb_storage/videos/clip_test.mp4")
-            self.assertTrue(result)
-            mock_run.assert_called_once()
+        result = self.camera.record_video("/mnt/usb_storage/videos/clip_test.mp4")
+        self.assertTrue(result)
+        mock_run.assert_called_once()
 
+    @patch("os.path.exists", return_value=False)
+    @patch("shutil.which")
     @patch("subprocess.run")
-    def test_record_video_failure_raises_camera_error(self, mock_run):
+    def test_record_video_success_with_mp4box(self, mock_run, mock_which, mock_exists):
+        mock_which.side_effect = lambda cmd: "/usr/bin/" + cmd if cmd in ["rpicam-vid", "MP4Box"] else None
+        mock_run.return_value = MagicMock(returncode=0)
+        result = self.camera.record_video("/mnt/usb_storage/videos/clip_test.mp4")
+        self.assertTrue(result)
+        self.assertEqual(mock_run.call_count, 2)
+
+    @patch("shutil.which")
+    @patch("subprocess.run")
+    def test_record_video_failure_raises_camera_error(self, mock_run, mock_which):
+        mock_which.side_effect = lambda cmd: "/usr/bin/rpicam-vid" if cmd == "rpicam-vid" else None
         mock_run.return_value = MagicMock(returncode=1, stderr="Camera hardware timeout")
-        with patch.object(self.camera, "resolve_binary", return_value="rpicam-vid"):
-            with self.assertRaises(CameraError):
-                self.camera.record_video("/mnt/usb_storage/videos/clip_test.mp4")
+        with self.assertRaises(CameraError):
+            self.camera.record_video("/mnt/usb_storage/videos/clip_test.mp4")
 
 
 if __name__ == "__main__":
