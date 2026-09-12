@@ -58,9 +58,13 @@ An autonomous, battery-powered edge camera system engineered to monitor a backya
 │   ├── include/
 │   │   ├── ArduinoMock.h       # Mock platform for host-side unit testing
 │   │   └── WatchdogFSM.h       # Finite state machine declarations
+│   ├── integ_test_scripts/     # Isolated hardware integration test scripts
+│   │   ├── test_pir_sensor.ino # Standalone Arduino Nano firmware for PIR testing
+│   │   └── test_pir_integration.py # Host test runner, handshake, & diagnostics
 │   ├── src/
 │   │   └── WatchdogFSM.cpp     # State machine implementation & power logic
 │   └── tests/
+│       ├── test_pir_integration_script.py # Test runner unit tests
 │       └── test_watchdog_fsm.cpp # Host unit tests (C++17)
 ├── Pi_Zero/                    # Media Node Software
 │   ├── scripts/
@@ -173,6 +177,36 @@ python3 Pi_Zero/scripts/test_camera_integration.py --dry-run
   ```bash
   python3 scripts/fetch_and_watch.py
   ```
+
+### 5. Hardware PIR Sensor Integration Test (Arduino Nano)
+
+To test the physical HC-SR501 PIR sensor in complete isolation on a physical Arduino Nano—verifying the pyroelectric warm-up stabilization, quiescent baseline noise immunity, INT0 (Pin D2) rising-edge hardware interrupt, digital state transitions, and pulse duration without powering on the Raspberry Pi—use the standalone integration test suite:
+
+#### Step A: Flash the Standalone Test Firmware to the Nano
+Open [`Arduino_Nano/integ_test_scripts/test_pir_sensor.ino`](Arduino_Nano/integ_test_scripts/test_pir_sensor.ino) in the Arduino IDE (or upload via `arduino-cli`) and flash it to the physical Arduino Nano:
+- Holds MOSFET Gate (Pin D8) HIGH to ensure the Raspberry Pi remains safely unpowered.
+- Configures Pin D2 (`INT0`) as INPUT with RISING edge interrupt.
+- Mirrors motion detection to onboard LED (Pin D13) for instant visual feedback.
+
+#### Step B: Run the Host Integration Test Runner
+Connect the Arduino Nano via USB to your Mac, PC, or Pi, and run:
+
+```bash
+# Auto-detects connected Arduino Nano serial port and runs guided test:
+python3 Arduino_Nano/integ_test_scripts/test_pir_integration.py
+
+# Skip 30s warm-up if sensor is already warmed up:
+python3 Arduino_Nano/integ_test_scripts/test_pir_integration.py --skip-warmup
+
+# Run live continuous event monitor:
+python3 Arduino_Nano/integ_test_scripts/test_pir_integration.py --monitor
+
+# View hardware wiring and potentiometer tuning guide:
+python3 Arduino_Nano/integ_test_scripts/test_pir_integration.py --troubleshoot
+
+# Dry-run mode (runs simulation without hardware attached):
+python3 Arduino_Nano/integ_test_scripts/test_pir_integration.py --dry-run
+```
 
 ---
 
