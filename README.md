@@ -42,7 +42,7 @@ An autonomous, battery-powered edge camera system engineered to monitor a backya
 | Signal | Origin | Destination | Electrical Characteristics |
 | :--- | :--- | :--- | :--- |
 | **PIR Motion Trigger** | HC-SR501 OUT | Arduino Nano Pin D2 (`INT0`) | Active-HIGH 3.3V pulse on motion |
-| **MOSFET Gate Control**| Arduino Nano Pin D8 | P-MOSFET Gate Driver | Active-LOW turns ON switched 5V rail |
+| **MOSFET Gate Control** | Arduino Nano Pin D8 | P-MOSFET Gate Driver | Active-LOW turns ON switched 5V rail |
 | **Shutdown Acknowledgment** | Pi Zero W GPIO 25 (Pin 22) | Arduino Nano Pin D6 | Active-HIGH 3.3V pulse signals OS halt |
 | **Camera Interface** | Pi Camera Module v2/v3 | Pi Zero W CSI Port | 15-pin ribbon to VideoCore IV ISP |
 | **Storage** | USB Flash Drive | Pi Zero W Micro-USB OTG | Mounted to `/mnt/usb_storage` |
@@ -117,6 +117,7 @@ clang++ -std=c++17 -DUNIT_TEST \
 ```
 
 **Validated Behaviors:**
+
 - D8 gate defaults to HIGH (Power OFF) and D2/D6 initialize as inputs.
 - PIR motion interrupt transitions the state machine to `STATE_POWER_ON` and pulls D8 LOW.
 - Signals are held active during Pi execution.
@@ -132,6 +133,7 @@ python3 -m unittest discover -s Pi_Zero/tests/ -v
 ```
 
 **Validated Behaviors:**
+
 - Storage discovery prioritizes partitions (`/dev/sda1`) over whole disks (`/dev/sda`).
 - Clean buffer sync (`os.sync()`) and filesystem unmounting before shutdown.
 - Graceful battery-saving abort when USB media is absent (`StorageNotFoundError`).
@@ -168,27 +170,34 @@ python3 Pi_Zero/scripts/test_camera_integration.py --dry-run
 > **Why 1080p @ 25 fps on the Pi Zero W?**
 > On Raspberry Pi OS (`libcamera` / `rpicam-vid`), camera pipeline and ISP processing run in user space on the Pi Zero's single-core 1.0 GHz ARM11 processor. At 1080p30, the single-core CPU operates near 100% saturation, which causes dropped frames from the sensor. Capping capture at **25 fps** reduces CPU overhead by ~20%, completely eliminating dropped frames and ensuring smooth, stutter-free playback.
 
-#### Smooth Playback & MP4 Containerization:
+#### Smooth Playback & MP4 Containerization
+
 - **On the Pi Zero:** `rpicam-vid` outputs raw H.264 elementary streams (`.h264`). To automatically package captures into standard ISO MP4 containers with constant PTS timestamps directly on the Pi Zero, install `MP4Box`:
+
   ```bash
   sudo apt update && sudo apt install -y gpac
   ```
+
 - **On macOS (1-Click Fetch & Watch):** Use the included helper script on your Mac to pull the latest recording from the Pi, encapsulate it with uniform 25 fps timestamps via `ffmpeg`, and launch it directly in QuickTime Player:
+
   ```bash
   python3 scripts/fetch_and_watch.py
   ```
 
 ### 5. Hardware PIR Sensor Integration Test (Arduino Nano)
 
-To test the physical HC-SR501 PIR sensor in complete isolation on a physical Arduino Nano—verifying the pyroelectric warm-up stabilization, quiescent baseline noise immunity, INT0 (Pin D2) rising-edge hardware interrupt, digital state transitions, and pulse duration without powering on the Raspberry Pi—use the standalone integration test suite:
+To test the physical HC-SR501 PIR sensor in complete isolation on a physical Arduino Nano—verifying the pyroelectric warm-up stabilization, quiescent baseline noise immunity, INT0 (Pin D2) rising-edge hardware interrupt, digital state transitions, and pulse duration without powering on the Raspberry Pi—use the standalone integration test suite. [Reference information on HC-SR501 PIR sensor](https://lastminuteengineers.com/pir-sensor-arduino-tutorial/).
 
 #### Step A: Flash the Standalone Test Firmware to the Nano
+
 Open [`Arduino_Nano/integ_test_scripts/test_pir_sensor.ino`](Arduino_Nano/integ_test_scripts/test_pir_sensor.ino) in the Arduino IDE (or upload via `arduino-cli`) and flash it to the physical Arduino Nano:
+
 - Holds MOSFET Gate (Pin D8) HIGH to ensure the Raspberry Pi remains safely unpowered.
 - Configures Pin D2 (`INT0`) as INPUT with RISING edge interrupt.
 - Mirrors motion detection to onboard LED (Pin D13) for instant visual feedback.
 
 #### Step B: Run the Host Integration Test Runner
+
 Connect the Arduino Nano via USB to your Mac, PC, or Pi, and run:
 
 ```bash
@@ -223,6 +232,7 @@ sudo ./Pi_Zero/scripts/optimize_os.sh
 ```
 
 **What this script does:**
+
 1. **Masks Unnecessary Services:** Disables background daemons not needed on an edge camera (`bluetooth.service`, `avahi-daemon.service`, `triggerhappy.service`, `ModemManager.service`, `apt-daily.service`).
 2. **Configures `/boot/config.txt`:**
    - Disables onboard Bluetooth (`dtoverlay=disable-bt`) and Wi-Fi (`dtoverlay=disable-wifi`).
@@ -243,6 +253,7 @@ sudo ./Pi_Zero/scripts/install.sh
 ```
 
 **What this script does:**
+
 1. Copies the `Pi_Zero` package to `/opt/squirrelfeeder/Pi_Zero`.
 2. Installs `gpac` (`MP4Box`) for native MP4 container muxing.
 3. Installs [`squirrel-record.service`](Pi_Zero/scripts/squirrel-record.service) to `/etc/systemd/system/squirrel-record.service`.
@@ -251,14 +262,19 @@ sudo ./Pi_Zero/scripts/install.sh
 ### Service Inspection & Troubleshooting
 
 - **Check Service Status:**
+
   ```bash
   systemctl status squirrel-record.service
   ```
+
 - **View Execution Logs:**
+
   ```bash
   journalctl -u squirrel-record.service -e
   ```
+
 - **Manually Trigger a Recording Run:**
+
   ```bash
   sudo systemctl start squirrel-record.service
   ```
@@ -268,10 +284,12 @@ sudo ./Pi_Zero/scripts/install.sh
 ## Flashing the Arduino Nano Watchdog
 
 1. Open [`Arduino_Nano/Arduino_Nano.ino`](Arduino_Nano/Arduino_Nano.ino) in the Arduino IDE or compile via `arduino-cli`:
+
    ```bash
    arduino-cli compile --fqbn arduino:avr:nano:cpu=atmega328old Arduino_Nano/
    arduino-cli upload -p /dev/ttyUSB0 --fqbn arduino:avr:nano:cpu=atmega328old Arduino_Nano/
    ```
+
 2. **HC-SR501 Sensor Hardware Configuration:**
    - **Trigger Mode Jumper:** Set to **`H` (Repeatable Trigger)** so the signal stays HIGH during motion.
    - **Time Delay Potentiometer:** Turn **fully counter-clockwise** to minimum delay (~3 seconds); the Arduino handles event timing.
@@ -285,6 +303,7 @@ sudo ./Pi_Zero/scripts/install.sh
 ## Spec-Driven Development (Conductor)
 
 This repository follows the **Spec-Driven Development (SDD)** protocol managed by the [Conductor](https://github.com/gemini-cli-extensions/conductor) plugin:
+
 - Track status and history are registered in [`conductor/tracks.md`](conductor/tracks.md).
 - Active track plan: [`conductor/tracks/squirrelfeeder_mvp_20260910/plan.md`](conductor/tracks/squirrelfeeder_mvp_20260910/plan.md).
 - Architectural requirements: [`conductor/product.md`](conductor/product.md) and [`conductor/tech-stack.md`](conductor/tech-stack.md).
