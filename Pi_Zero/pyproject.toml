@@ -2,7 +2,7 @@
 name = "squirrelfeeder-pi-zero"
 version = "0.1.0"
 description = "Raspberry Pi Zero W Media Pipeline for SquirrelFeeder"
-requires-python = ">=3.9"
+requires-python = ">=3.12"
 dependencies = []
 
 [dependency-groups]
