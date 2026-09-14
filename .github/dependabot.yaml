@@ -1,0 +1,22 @@
+version: 1
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    reviewers:
+      - "kesterDL"
+    assignees:
+      - "kesterDL"
+
+  - package-ecosystem: "npm"
+    directories:
+      - "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    reviewers:
+      - "kesterDL"
+    assignees:
+      - "kesterDL"
+      

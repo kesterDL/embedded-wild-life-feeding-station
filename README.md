@@ -2,7 +2,7 @@
 
 [![Hardware](https://img.shields.io/badge/Hardware-Arduino_Nano_%2B_Pi_Zero_W-blue.svg)](#hardware-architecture)
 [![Firmware](https://img.shields.io/badge/Firmware-ATmega328P_C%2B%2B17-green.svg)](#1-firmware-unit-tests-arduino-nano)
-[![Media Node](https://img.shields.io/badge/Media_Node-Python_3.9%2B-orange.svg)](#2-python-media-pipeline-unit-tests-pi-zero-w)
+[![Media Node](https://img.shields.io/badge/Media_Node-Python_3.12%2B-orange.svg)](#2-python-media-pipeline-unit-tests-pi-zero-w)
 [![SDD Framework](https://img.shields.io/badge/Workflow-Spec--Driven_Development-purple.svg)](#spec-driven-development-conductor)
 
 An autonomous, battery-powered edge camera system engineered to monitor a backyard wildlife feeding station. The system balances ultra-low-power standby consumption with high-definition video capture by leveraging an asymmetric **Dual-Hardware Architecture**:

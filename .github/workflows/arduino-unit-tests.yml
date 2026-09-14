@@ -1,0 +1,68 @@
+name: Arduino Unit Tests
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - "Arduino_Nano/**"
+      - ".github/workflows/arduino-unit-tests.yml"
+  push:
+    branches: [main]
+    paths:
+      - "Arduino_Nano/**"
+      - ".github/workflows/arduino-unit-tests.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  firmware-cpp-tests:
+    name: Run Firmware C++ Unit Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Compile Watchdog FSM Unit Tests
+        run: |
+          g++ -std=c++17 -Wall -Wextra -Werror -DUNIT_TEST \
+            -IArduino_Nano/include \
+            Arduino_Nano/src/WatchdogFSM.cpp \
+            Arduino_Nano/tests/test_watchdog_fsm.cpp \
+            -o test_runner
+
+      - name: Run Firmware Unit Tests
+        run: ./test_runner
+        env:
+          CI: true
+
+  harness-python-tests:
+    name: Run Python Harness Unit Tests (3.12)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.4.0
+        with:
+          python-version: "3.12"
+
+      - name: Run Python Harness Tests
+        run: python3 -m unittest Arduino_Nano/tests/test_pir_integration_script.py
+        env:
+          CI: true
+          TZ: UTC
