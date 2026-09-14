@@ -42,7 +42,8 @@ class TestPIRIntegrationScript(unittest.TestCase):
         self.assertTrue("[WARMUP_SKIPPED]" in joined or "[READY]" in joined)
 
     def test_list_candidate_serial_ports(self):
-        with patch("glob.glob") as mock_glob:
+        with patch("Arduino_Nano.integ_test_scripts.test_pir_integration.HAS_PYSERIAL", False), \
+             patch("glob.glob") as mock_glob:
             mock_glob.side_effect = lambda pat: ["/dev/cu.usbserial-1410"] if "usbserial" in pat else []
             ports = list_candidate_serial_ports()
             self.assertIn("/dev/cu.usbserial-1410", ports)

@@ -1,0 +1,58 @@
+name: Pi Zero Unit Tests
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - "Pi_Zero/**"
+      - ".github/workflows/pi-zero-unit-tests.yml"
+  push:
+    branches: [main]
+    paths:
+      - "Pi_Zero/**"
+      - ".github/workflows/pi-zero-unit-tests.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Run Pytest Unit Tests (${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+
+    defaults:
+      run:
+        working-directory: Pi_Zero
+
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: "0.6.12"
+          enable-cache: true
+          cache-dependency-glob: "Pi_Zero/uv.lock"
+
+      - name: Set up Python
+        run: uv python install ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: uv sync --python ${{ matrix.python-version }} --frozen --dev
+
+      - name: Run Unit Tests
+        run: uv run --python ${{ matrix.python-version }} pytest
+        env:
+          CI: true
+          TZ: UTC
