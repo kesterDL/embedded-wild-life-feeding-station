@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   test:
-    name: Run Pytest Unit Tests (${{ matrix.python-version }})
+    name: Run Pytest Unit Tests (3.12)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -27,10 +27,6 @@ jobs:
     defaults:
       run:
         working-directory: Pi_Zero
-
-    strategy:
-      matrix:
-        python-version: ["3.11", "3.12"]
 
     steps:
       - name: Checkout repository
@@ -46,13 +42,13 @@ jobs:
           cache-dependency-glob: "Pi_Zero/uv.lock"
 
       - name: Set up Python
-        run: uv python install ${{ matrix.python-version }}
+        run: uv python install 3.12
 
       - name: Install dependencies
-        run: uv sync --python ${{ matrix.python-version }} --frozen --dev
+        run: uv sync --python 3.12 --frozen --dev
 
       - name: Run Unit Tests
-        run: uv run --python ${{ matrix.python-version }} pytest
+        run: uv run --python 3.12 pytest
         env:
           CI: true
           TZ: UTC

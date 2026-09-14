@@ -44,15 +44,11 @@ jobs:
           CI: true
 
   harness-python-tests:
-    name: Run Python Harness Unit Tests (${{ matrix.python-version }})
+    name: Run Python Harness Unit Tests (3.12)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       contents: read
-
-    strategy:
-      matrix:
-        python-version: ["3.11", "3.12"]
 
     steps:
       - name: Checkout repository
@@ -60,10 +56,10 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Set up Python ${{ matrix.python-version }}
+      - name: Set up Python
         uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.4.0
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: "3.12"
 
       - name: Run Python Harness Tests
         run: python3 -m unittest Arduino_Nano/tests/test_pir_integration_script.py
