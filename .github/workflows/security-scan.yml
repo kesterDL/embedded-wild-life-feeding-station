@@ -1,0 +1,93 @@
+name: Security Scan
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - "Pi_Zero/**"
+      - "Arduino_Nano/**"
+      - ".github/workflows/security-scan.yml"
+  push:
+    branches: [main]
+    paths:
+      - "Pi_Zero/**"
+      - "Arduino_Nano/**"
+      - ".github/workflows/security-scan.yml"
+  schedule:
+    # Run weekly on Mondays at 00:00 UTC to detect newly disclosed CVEs against existing dependencies
+    - cron: "0 0 * * 1"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python-security:
+    name: Python Security & Dependency Audit (3.12)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+
+    defaults:
+      run:
+        working-directory: Pi_Zero
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: "0.6.12"
+          enable-cache: true
+          cache-dependency-glob: "Pi_Zero/uv.lock"
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        run: uv sync --python 3.12 --frozen --dev
+
+      - name: Audit Python Packages for Known Vulnerabilities (pip-audit)
+        run: uv run --with pip-audit pip-audit
+
+      - name: Run Static Security Analysis (Bandit)
+        run: uv run --with bandit bandit -r src/ -ll
+
+  cpp-security:
+    name: C++ Firmware & Tests Security Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install Cppcheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cppcheck
+
+      - name: Run Cppcheck Security & Static Analysis
+        run: |
+          cppcheck --std=c++17 \
+            --enable=warning,style,performance,portability \
+            --error-exitcode=1 \
+            --inline-suppr \
+            --suppress=missingIncludeSystem \
+            -DUNIT_TEST \
+            -I Arduino_Nano/include \
+            Arduino_Nano/src \
+            Arduino_Nano/tests
+
+      - name: Run Flawfinder (C/C++ CWE Security Scanner)
+        run: |
+          pipx run flawfinder --minlevel=2 Arduino_Nano/

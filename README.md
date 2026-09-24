@@ -47,6 +47,9 @@ An autonomous, battery-powered edge camera system engineered to monitor a backya
 | **Camera Interface** | Pi Camera Module v2/v3 | Pi Zero W CSI Port | 15-pin ribbon to VideoCore IV ISP |
 | **Storage** | USB Flash Drive | Pi Zero W Micro-USB OTG | Mounted to `/mnt/usb_storage` |
 
+> [!TIP]
+> For a complete, sequential hardware assembly walkthrough, pinout diagrams, and pre-flight multimeter testing instructions, see the [Step-by-Step Hardware Wiring Guide](./step-by-step_wiring%20instructions.md).
+
 ---
 
 ## Repository Structure
@@ -54,6 +57,7 @@ An autonomous, battery-powered edge camera system engineered to monitor a backya
 ```text
 .
 ├── Arduino_Nano/               # Watchdog Firmware
+│   ├── README.md               # Watchdog architecture & FSM execution guide
 │   ├── Arduino_Nano.ino        # Main Arduino sketch & interrupt bindings
 │   ├── include/
 │   │   ├── ArduinoMock.h       # Mock platform for host-side unit testing
