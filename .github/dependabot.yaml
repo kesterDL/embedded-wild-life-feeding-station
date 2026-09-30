@@ -1,31 +1,146 @@
+---
 version: 2
-updates:
-  - package-ecosystem: "github-actions"
-    directory: "/"
-    schedule:
-      interval: "weekly"
-    reviewers:
-      - "kesterDL"
-    assignees:
-      - "kesterDL"
-    groups:
-      dependencies:
-        patterns:
-          - "*"
 
-  - package-ecosystem: "uv"
-    directory: "/Pi_Zero"
+updates:
+  # ---------------------------------------------------------------------------
+  # 1. GitHub Actions
+  # ---------------------------------------------------------------------------
+  - package-ecosystem: 'github-actions'
+    directory: '/'
     schedule:
-      interval: "weekly"
+      interval: 'weekly'
+      day: 'monday'
+      time: '04:00'
+      timezone: 'America/Chicago'
     open-pull-requests-limit: 10
     reviewers:
-      - "kesterDL"
+      - 'kesterDL'
     assignees:
-      - "kesterDL"
+      - 'kesterDL'
+    commit-message:
+      prefix: 'chore(ci)'
     groups:
-      dependencies:
+      actions:
         patterns:
-          - "*"
+          - '*'
     ignore:
-      - dependency-name: "*"
-        update-types: ["version-update:semver-patch"]
+      - dependency-name: '*'
+        update-types: ['version-update:semver-patch']
+
+  # ---------------------------------------------------------------------------
+  # 2. Pi Zero Python Ecosystem (uv)
+  # ---------------------------------------------------------------------------
+  - package-ecosystem: 'uv'
+    directory: '/Pi_Zero'
+    schedule:
+      interval: 'weekly'
+      day: 'monday'
+      time: '04:00'
+      timezone: 'America/Chicago'
+    open-pull-requests-limit: 10
+    reviewers:
+      - 'kesterDL'
+    assignees:
+      - 'kesterDL'
+    commit-message:
+      prefix: 'chore(deps)'
+    cooldown:
+      default-days: 7
+      semver-major-days: 14
+      semver-minor-days: 7
+      semver-patch-days: 3
+    groups:
+      # Keep pytest and test tooling ecosystem in lockstep
+      testing-tooling:
+        patterns:
+          - 'pytest*'
+          - 'pluggy*'
+          - 'iniconfig*'
+          - 'coverage*'
+          - 'mock*'
+          - 'hypothesis*'
+        update-types:
+          - 'minor'
+          - 'patch'
+
+      # Keep code quality, linting, and security audit tools unified
+      code-quality:
+        patterns:
+          - 'ruff*'
+          - 'flake8*'
+          - 'mypy*'
+          - 'black*'
+          - 'bandit*'
+          - 'pip-audit*'
+        update-types:
+          - 'minor'
+          - 'patch'
+
+      # Keep Raspberry Pi hardware and GPIO interfaces unified
+      hardware-gpio:
+        patterns:
+          - 'rpi-gpio*'
+          - 'RPi.GPIO*'
+          - 'gpiod*'
+          - 'gpiozero*'
+          - 'spidev*'
+          - 'smbus*'
+        update-types:
+          - 'minor'
+          - 'patch'
+
+      # Media recording, video transcoding, and camera pipeline
+      media-processing:
+        patterns:
+          - 'imageio*'
+          - 'imageio-ffmpeg*'
+          - 'pillow*'
+          - 'opencv*'
+          - 'picamera*'
+        update-types:
+          - 'minor'
+          - 'patch'
+
+      # General development dependencies
+      development-tools:
+        dependency-type: 'development'
+        exclude-patterns:
+          - 'pytest*'
+          - 'pluggy*'
+          - 'iniconfig*'
+          - 'coverage*'
+          - 'mock*'
+          - 'hypothesis*'
+          - 'ruff*'
+          - 'flake8*'
+          - 'mypy*'
+          - 'black*'
+          - 'bandit*'
+          - 'pip-audit*'
+        update-types:
+          - 'minor'
+          - 'patch'
+
+      # Production runtime dependencies
+      runtime-dependencies:
+        dependency-type: 'production'
+        exclude-patterns:
+          - 'rpi-gpio*'
+          - 'RPi.GPIO*'
+          - 'gpiod*'
+          - 'gpiozero*'
+          - 'spidev*'
+          - 'smbus*'
+          - 'imageio*'
+          - 'imageio-ffmpeg*'
+          - 'pillow*'
+          - 'opencv*'
+          - 'picamera*'
+        update-types:
+          - 'minor'
+          - 'patch'
+
+    ignore:
+      # Suppress routine individual patch noise
+      - dependency-name: '*'
+        update-types: ['version-update:semver-patch']
