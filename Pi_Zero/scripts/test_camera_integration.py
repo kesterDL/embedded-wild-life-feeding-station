@@ -178,6 +178,21 @@ def print_troubleshooting_tips():
     print("=" * 60 + "\n")
 
 
+def resolve_default_recordings_dir() -> str:
+    """Finds the SD card recordings directory visible when plugged into Mac."""
+    for candidate in ["/boot/firmware", "/boot", "/Volumes/boot", "/Volumes/bootfs"]:
+        if os.path.exists(candidate) and os.path.isdir(candidate):
+            target = os.path.join(candidate, "Wild_Life_Recordings")
+            try:
+                os.makedirs(target, exist_ok=True)
+                return target
+            except OSError:
+                pass
+    target = os.path.abspath("./Wild_Life_Recordings")
+    os.makedirs(target, exist_ok=True)
+    return target
+
+
 def run_integration_test(
     duration_sec: int = 20,
     output_path: Optional[str] = None,
@@ -195,9 +210,11 @@ def run_integration_test(
         if output_path.lower().endswith(".h264"):
             wants_mp4 = False
     else:
-        output_path = os.path.abspath(f"./camera_test_{timestamp}.mp4")
+        rec_dir = resolve_default_recordings_dir()
+        output_path = os.path.join(rec_dir, f"camera_test_{timestamp}.mp4")
 
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
+
 
     print("=" * 60)
     print("      Raspberry Pi Zero W - Camera Integration Test")
@@ -314,14 +331,23 @@ def run_integration_test(
         print_troubleshooting_tips()
         return False
 
+    # Flush disk buffers to SD card
+    os.sync()
+    try:
+        subprocess.run(["sync"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
+    except OSError:
+        pass
+
     # Success Banner
     print("\n" + "=" * 60)
     print("     ✓ CAMERA INTEGRATION TEST PASSED SUCCESSFULLY!")
     print("=" * 60)
     print(f"  • Video Saved:    {actual_output_path}")
+    print(f"  • Folder:         Wild_Life_Recordings")
     print(f"  • Duration:       {duration_sec}s recorded")
     print(f"  • File Size:      {file_size_mb:.2f} MB")
     print(f"  • Camera Status:  Turned off & pipeline released")
+    print(f"  • SD Card Access: Visible in 'Wild_Life_Recordings' when inserted into Mac")
 
     if actual_output_path.endswith(".h264"):
         print("\n  [PLAYBACK NOTE]")

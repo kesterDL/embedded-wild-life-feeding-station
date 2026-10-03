@@ -8,6 +8,7 @@ Before=shutdown.target
 Type=oneshot
 User=root
 WorkingDirectory=/opt/squirrelfeeder
+Environment="PYTHONPATH=/opt/squirrelfeeder"
 ExecStart=/usr/bin/python3 -m Pi_Zero.src.orchestrator
 StandardOutput=journal+console
 StandardError=journal+console

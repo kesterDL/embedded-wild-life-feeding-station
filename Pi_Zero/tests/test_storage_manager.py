@@ -1,4 +1,5 @@
 import os
+import subprocess
 import unittest
 from unittest.mock import patch, MagicMock
 from Pi_Zero.src.storage_manager import StorageManager, StorageNotFoundError
@@ -44,7 +45,8 @@ class TestStorageManager(unittest.TestCase):
 
         result = self.sm.mount()
         self.assertTrue(result)
-        mock_makedirs.assert_called_with("/mnt/usb_storage", exist_ok=True)
+        mock_makedirs.assert_any_call("/mnt/usb_storage", exist_ok=True)
+        mock_makedirs.assert_any_call("/mnt/usb_storage/Wild_Life_Recordings", exist_ok=True)
         mock_run.assert_called()
         cmd = mock_run.call_args[0][0]
         self.assertIn("mount", cmd)
@@ -75,10 +77,51 @@ class TestStorageManager(unittest.TestCase):
     @patch("os.makedirs")
     def test_generate_video_path_format(self, mock_makedirs):
         path = self.sm.generate_video_path(timestamp="20260910_123000")
-        expected_path = "/mnt/usb_storage/videos/clip_20260910_123000.mp4"
+        expected_path = "/mnt/usb_storage/Wild_Life_Recordings/clip_20260910_123000.mp4"
         self.assertEqual(path, expected_path)
-        mock_makedirs.assert_called_with("/mnt/usb_storage/videos", exist_ok=True)
+        mock_makedirs.assert_called_with("/mnt/usb_storage/Wild_Life_Recordings", exist_ok=True)
+
+    @patch("os.path.isdir")
+    @patch("os.path.exists")
+    def test_sd_card_path_resolution_bookworm(self, mock_exists, mock_isdir):
+        # On Raspberry Pi OS Bookworm, /boot/firmware is the FAT partition
+        mock_exists.side_effect = lambda p: p == "/boot/firmware"
+        mock_isdir.side_effect = lambda p: p == "/boot/firmware"
+        sm = StorageManager(use_sd_card=True)
+        self.assertEqual(sm.recordings_dir, "/boot/firmware/Wild_Life_Recordings")
+
+    @patch("os.path.isdir")
+    @patch("os.path.exists")
+    def test_sd_card_path_resolution_bullseye(self, mock_exists, mock_isdir):
+        # On Raspberry Pi OS Bullseye, /boot is the FAT partition
+        mock_exists.side_effect = lambda p: p == "/boot"
+        mock_isdir.side_effect = lambda p: p == "/boot"
+        sm = StorageManager(use_sd_card=True)
+        self.assertEqual(sm.recordings_dir, "/boot/Wild_Life_Recordings")
+
+    @patch("os.chmod")
+    @patch("os.makedirs")
+    def test_sd_card_mount_creates_directory(self, mock_makedirs, mock_chmod):
+        sm = StorageManager(use_sd_card=True)
+        res = sm.mount()
+        self.assertTrue(res)
+        mock_makedirs.assert_called_with(sm.recordings_dir, exist_ok=True)
+
+    @patch("subprocess.run")
+    @patch("os.sync")
+    def test_sd_card_unmount_flushes_sync(self, mock_sync, mock_run):
+        sm = StorageManager(use_sd_card=True)
+        res = sm.unmount()
+        self.assertTrue(res)
+        mock_sync.assert_called_once()
+        mock_run.assert_called_with(
+            ["sync"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False
+        )
 
 
 if __name__ == "__main__":
     unittest.main()
+

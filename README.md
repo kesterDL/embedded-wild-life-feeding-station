@@ -176,17 +176,29 @@ python3 Pi_Zero/scripts/test_camera_integration.py --dry-run
 
 #### Smooth Playback & MP4 Containerization
 
-- **On the Pi Zero:** `rpicam-vid` outputs raw H.264 elementary streams (`.h264`). To automatically package captures into standard ISO MP4 containers with constant PTS timestamps directly on the Pi Zero, install `MP4Box`:
+- **On the Pi Zero:** `rpicam-vid` outputs raw H.264 elementary streams (`.h264`). To automatically package captures into standard ISO MP4 containers with constant PTS timestamps directly on the Pi Zero, install `ffmpeg` (or `MP4Box` / `gpac`):
 
   ```bash
-  sudo apt update && sudo apt install -y gpac
+  sudo apt update && sudo apt install -y ffmpeg
   ```
 
-- **On macOS (1-Click Fetch & Watch):** Use the included helper script on your Mac to pull the latest recording from the Pi, encapsulate it with uniform 25 fps timestamps via `ffmpeg`, and launch it directly in QuickTime Player:
+- **Direct SD Card Access on macOS:** All wildlife videos are automatically stored in the `Wild_Life_Recordings` folder on the SD card's FAT boot partition. When you remove the SD card from the Pi and insert it into your Mac:
+  - The volume mounts automatically as `/Volumes/boot` (or `/Volumes/bootfs`).
+  - Open Finder to find all videos ready to watch in the **`Wild_Life_Recordings`** folder.
+
+- **On macOS (1-Click Fetch & Watch):** Use the included helper script on your Mac to automatically detect an inserted SD card or fetch recordings over Wi-Fi via `scp`, encapsulate raw streams into QuickTime-compatible MP4s, and launch the newest clip:
 
   ```bash
-  python3 scripts/fetch_and_watch.py
+  # Automatically detects inserted SD card or fetches newest recording over Wi-Fi:
+  python3 Pi_Zero/scripts/fetch_and_watch.py
+
+  # List all available recordings:
+  python3 Pi_Zero/scripts/fetch_and_watch.py --list
+
+  # Play recordings without network fetch:
+  python3 Pi_Zero/scripts/fetch_and_watch.py --no-fetch
   ```
+
 
 ### 5. Hardware PIR Sensor Integration Test (Arduino Nano)
 

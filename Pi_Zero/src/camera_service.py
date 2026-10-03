@@ -68,12 +68,17 @@ class CameraService:
         wants_mp4 = output_path.lower().endswith(".mp4")
         mp4box = shutil.which("MP4Box")
         ffmpeg = shutil.which("ffmpeg")
+        has_muxer = bool(mp4box or ffmpeg)
 
-        raw_target = (
-            os.path.splitext(output_path)[0] + "_temp.h264"
-            if wants_mp4 and (mp4box or ffmpeg)
-            else output_path
-        )
+        if wants_mp4 and has_muxer:
+            raw_target = os.path.splitext(output_path)[0] + "_temp.h264"
+        elif wants_mp4 and not has_muxer:
+            # When no containerizer is available, save with genuine .h264 extension
+            # to prevent writing raw elementary streams into a corrupt .mp4 file.
+            raw_target = os.path.splitext(output_path)[0] + ".h264"
+        else:
+            raw_target = output_path
+
 
         cmd = self.build_command(raw_target)
         try:
