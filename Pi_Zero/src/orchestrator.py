@@ -6,6 +6,7 @@ graceful unmount, and watchdog power cutoff signaling.
 
 import argparse
 import logging
+import os
 import subprocess
 import sys
 from typing import Optional
@@ -40,6 +41,24 @@ class MediaOrchestrator:
         except Exception as e:
             logger.error(f"Failed to execute poweroff: {e}")
 
+    def is_maintenance_mode(self) -> bool:
+        """Checks if a maintenance flag file exists to prevent automatic poweroff.
+
+        Allows developers to prevent shutdown by simply creating an empty file named
+        'maintenance' or 'no_shutdown' on the SD card boot partition or in Wild_Life_Recordings.
+        """
+        candidate_paths = [
+            "/boot/firmware/maintenance",
+            "/boot/firmware/no_shutdown",
+            "/boot/maintenance",
+            "/boot/no_shutdown",
+            "/Volumes/bootfs/maintenance",
+            "/Volumes/boot/maintenance",
+            os.path.join(getattr(self.storage_manager, "recordings_dir", ""), "maintenance"),
+            os.path.join(getattr(self.storage_manager, "recordings_dir", ""), "no_shutdown")
+        ]
+        return any(os.path.exists(p) for p in candidate_paths if p)
+
     def run_cycle(self, dry_run: bool = False) -> bool:
         """Executes the complete edge capture cycle:
 
@@ -57,7 +76,7 @@ class MediaOrchestrator:
         except StorageNotFoundError as e:
             logger.error(f"Storage unavailable: {e}. Aborting to preserve battery.")
             self.watchdog_bridge.signal_shutdown_ack()
-            if not dry_run:
+            if not dry_run and not self.is_maintenance_mode():
                 self.halt_system()
             return False
 
@@ -82,10 +101,13 @@ class MediaOrchestrator:
             self.watchdog_bridge.signal_shutdown_ack()
 
             # 5. Halt System
-            if not dry_run:
+            if dry_run or self.is_maintenance_mode():
+                logger.info("Maintenance mode or dry-run active. Skipping system poweroff.")
+            else:
                 self.halt_system()
 
         return success
+
 
 
 def main():
