@@ -92,10 +92,6 @@ class StorageManager:
         """
         if self.use_sd_card:
             os.makedirs(self.recordings_dir, exist_ok=True)
-            try:
-                os.chmod(self.recordings_dir, 0o777)
-            except OSError:
-                pass
             return True
 
         # External USB Storage Mode

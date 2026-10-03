@@ -99,9 +99,8 @@ class TestStorageManager(unittest.TestCase):
         sm = StorageManager(use_sd_card=True)
         self.assertEqual(sm.recordings_dir, "/boot/Wild_Life_Recordings")
 
-    @patch("os.chmod")
     @patch("os.makedirs")
-    def test_sd_card_mount_creates_directory(self, mock_makedirs, mock_chmod):
+    def test_sd_card_mount_creates_directory(self, mock_makedirs):
         sm = StorageManager(use_sd_card=True)
         res = sm.mount()
         self.assertTrue(res)
