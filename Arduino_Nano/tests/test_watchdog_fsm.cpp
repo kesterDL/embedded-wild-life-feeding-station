@@ -82,13 +82,13 @@ void test_failsafe_timeout_force_cuts_power() {
     fsm.onMotionDetected();
     fsm.update(); // STATE_WAIT_SHUTDOWN
 
-    // Simulate 59 seconds elapsing without ACK
-    MockArduinoPlatform::instance().advanceTimeMs(59000);
+    // Simulate 119 seconds elapsing without ACK
+    MockArduinoPlatform::instance().advanceTimeMs(119000);
     fsm.update();
-    run_test("Power still ON at 59 seconds", MockArduinoPlatform::instance().getPinValue(PIN_MOSFET_GATE) == LOW);
-    run_test("Still in STATE_WAIT_SHUTDOWN at 59s", fsm.getState() == WatchdogState::STATE_WAIT_SHUTDOWN);
+    run_test("Power still ON at 119 seconds", MockArduinoPlatform::instance().getPinValue(PIN_MOSFET_GATE) == LOW);
+    run_test("Still in STATE_WAIT_SHUTDOWN at 119s", fsm.getState() == WatchdogState::STATE_WAIT_SHUTDOWN);
 
-    // Advance to 60,001 ms (exceeding failsafe limit)
+    // Advance to 120,001 ms (exceeding failsafe limit)
     MockArduinoPlatform::instance().advanceTimeMs(1001);
     fsm.update();
     run_test("Failsafe triggers: D8 HIGH (Power cut)", MockArduinoPlatform::instance().getPinValue(PIN_MOSFET_GATE) == HIGH);

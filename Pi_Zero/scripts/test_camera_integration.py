@@ -185,7 +185,8 @@ def resolve_default_recordings_dir() -> str:
             target = os.path.join(candidate, "Wild_Life_Recordings")
             try:
                 os.makedirs(target, exist_ok=True)
-                return target
+                if os.access(target, os.W_OK):
+                    return target
             except OSError:
                 pass
     target = os.path.abspath("./Wild_Life_Recordings")

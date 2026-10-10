@@ -55,7 +55,7 @@ classDiagram
 
     class HardwareTimers {
         <<constants>>
-        +unsigned long FAILSAFE_TIMEOUT_MS = 60000UL
+        +unsigned long FAILSAFE_TIMEOUT_MS = 120000UL
         +unsigned long SHUTDOWN_DELAY_MS = 5000UL
     }
 
@@ -197,7 +197,7 @@ sequenceDiagram
   - Captures acknowledgment timestamp: `m_ackReceivedTime = millis()`.
   - Transitions to `STATE_POWER_OFF_DELAY`.
 - **Branch B — Hardware Failsafe Protection:**
-  - Evaluates `(millis() - m_powerOnTime) >= FAILSAFE_TIMEOUT_MS` (60,000 ms).
+  - Evaluates `(millis() - m_powerOnTime) >= FAILSAFE_TIMEOUT_MS` (120,000 ms).
   - If the Raspberry Pi fails to boot, encounters kernel panic, suffers SD card corruption, or hangs, the timer trips.
   - Calls `cutPower()` immediately (`D8` set to `HIGH`, `D13` set to `LOW`).
   - Returns directly to `STATE_SLEEP`, protecting the battery against total drain.

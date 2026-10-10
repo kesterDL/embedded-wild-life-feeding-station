@@ -35,8 +35,12 @@ fi
 mkdir -p "${RECORDINGS_DIR}"
 chmod 777 "${RECORDINGS_DIR}" || true
 
-# Create symlink for standard user convenience if david exists
-if id "david" &>/dev/null; then
+# Create symlink for standard user convenience
+TARGET_USER="${SUDO_USER:-$(logname 2>/dev/null || echo "$USER")}"
+if [ -n "$TARGET_USER" ] && [ "$TARGET_USER" != "root" ] && [ -d "/home/${TARGET_USER}" ]; then
+  ln -sfn "${RECORDINGS_DIR}" "/home/${TARGET_USER}/Wild_Life_Recordings"
+  chown -h "${TARGET_USER}:${TARGET_USER}" "/home/${TARGET_USER}/Wild_Life_Recordings" 2>/dev/null || true
+elif id "david" &>/dev/null; then
   ln -sfn "${RECORDINGS_DIR}" /home/david/Wild_Life_Recordings
   chown -h david:david /home/david/Wild_Life_Recordings 2>/dev/null || true
 fi

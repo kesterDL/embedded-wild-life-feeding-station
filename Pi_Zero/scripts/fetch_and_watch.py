@@ -56,29 +56,32 @@ def find_mounted_sd_card_dir() -> Optional[str]:
 import re
 
 
-def fetch_from_pi(host: str, dest_dir: str):
+def fetch_from_pi(host: str, dest_dir: str, remote_dir: Optional[str] = None):
     """Downloads recordings from the remote Raspberry Pi via rsync or scp."""
-    print(f"=== Fetching recordings from {host} ===")
     os.makedirs(dest_dir, exist_ok=True)
-
     rsync_bin = shutil.which("rsync")
-    if rsync_bin:
-        print("Syncing recordings via rsync (incremental, preserves timestamps)...")
-        # Sync directly from ~/Wild_Life_Recordings/ (symlinked to /boot/firmware/Wild_Life_Recordings)
-        cmd = [rsync_bin, "-avz", "--copy-links", f"{host}:~/{RECORDINGS_DIR_NAME}/", f"{dest_dir}/"]
+
+    candidates = [remote_dir] if remote_dir else [RECORDINGS_DIR_NAME, f"SquirrelFeeder/{RECORDINGS_DIR_NAME}"]
+
+    for candidate in candidates:
+        print(f"=== Fetching recordings from {host}:~/{candidate}/ ===")
+        if rsync_bin:
+            print("Syncing recordings via rsync (incremental, preserves timestamps)...")
+            cmd = [rsync_bin, "-avz", "--copy-links", f"{host}:~/{candidate}/", f"{dest_dir}/"]
+            res = subprocess.run(cmd, check=False)
+            if res.returncode == 0:
+                print("✓ Files synced successfully via rsync.")
+                return
+
+        # Fallback to scp command preserving timestamps
+        print("Connecting via scp (enter password if prompted)...")
+        cmd = ["scp", "-p", f"{host}:~/{candidate}/*", dest_dir]
         res = subprocess.run(cmd, check=False)
         if res.returncode == 0:
-            print("✓ Files synced successfully via rsync.")
+            print("✓ Files fetched successfully.")
             return
 
-    # Fallback to single scp command preserving timestamps
-    print("Connecting via scp (enter password if prompted)...")
-    cmd = ["scp", "-p", f"{host}:~/{RECORDINGS_DIR_NAME}/*", dest_dir]
-    res = subprocess.run(cmd, check=False)
-    if res.returncode == 0:
-        print("✓ Files fetched successfully.")
-    else:
-        print("Note: SCP finished.")
+    print("Note: Finished attempting to fetch recordings.")
 
 
 def is_mp4_container(filepath: str) -> bool:
@@ -216,6 +219,12 @@ def main():
         help="List all recordings found and exit"
     )
     parser.add_argument(
+        "--remote-dir",
+        type=str,
+        default=None,
+        help="Optional remote directory path on the Pi (e.g. SquirrelFeeder/Wild_Life_Recordings)"
+    )
+    parser.add_argument(
         "-f", "--file",
         type=str,
         default=None,
@@ -244,7 +253,7 @@ def main():
     else:
         active_dir = local_dir
         if should_fetch:
-            fetch_from_pi(host=args.host, dest_dir=local_dir)
+            fetch_from_pi(host=args.host, dest_dir=local_dir, remote_dir=args.remote_dir)
 
 
     # Search directories for candidate video files

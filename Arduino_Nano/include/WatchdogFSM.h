@@ -22,7 +22,7 @@ constexpr uint8_t PIN_STATUS_LED = 13; // Onboard LED for status indication
 
 // Hardware Timers & Timeouts
 constexpr unsigned long FAILSAFE_TIMEOUT_MS =
-    60000UL; // 60s max active runtime failsafe
+    120000UL; // 120s max active runtime failsafe
 constexpr unsigned long SHUTDOWN_DELAY_MS =
     5000UL; // 5s grace period for OS halt after ACK
 
