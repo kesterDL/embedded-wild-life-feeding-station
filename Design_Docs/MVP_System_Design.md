@@ -91,7 +91,7 @@ A self-contained, battery-powered edge device that:
 | **PIR Trigger** | HC-SR501 OUT | Nano Pin D2 (`INT0`) | Active HIGH: 3.3V on motion |
 | **MOSFET Gate** | Nano Pin D8 | Gate Driver Transistor | Active LOW to saturate P-MOSFET |
 | **Switched 5V Rail**| MOSFET Drain | Pi Zero W 5V Pins (Pin 2, 4) | Powers on Pi when MOSFET conducts |
-| **Shutdown ACK** | Pi Zero W GPIO 25 (Pin 22) | Nano Pin D6 | Active HIGH: 3.3V signal to cut power |
+| **Shutdown ACK** | Pi Zero W GPIO 25 (Pin 22) | Nano Pin D6 | Active HIGH: 3.3V signal to cut power (requires 10 kΩ pull-down resistor to GND on D6) |
 
 ### 2.2 HC-SR501 Sensor Tuning & Setup
 
@@ -463,7 +463,7 @@ Follow this four-phase benchtop sequence to validate each subsystem independentl
 
 ### Phase 2: Arduino Nano MOSFET Power Switching
 1. Wire the P-channel MOSFET between the 5V power supply and the Pi Zero W 5V pins.
-2. Connect Nano D8 to the MOSFET gate and D6 to Pi GPIO 25.
+2. Connect Nano D8 to the MOSFET gate and D6 to Pi GPIO 25. Install a 10 kΩ pull-down resistor between Nano D6 and GND to prevent floating input noise.
 3. Power the Nano. Pull Nano D2 HIGH manually with a jumper wire to simulate a trigger.
 4. Confirm:
    - MOSFET turns ON; Pi Zero W boots.

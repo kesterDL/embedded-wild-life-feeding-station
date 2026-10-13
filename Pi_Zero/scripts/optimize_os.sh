@@ -28,6 +28,11 @@ SERVICES=(
   apt-daily.service
   apt-daily-upgrade.service
   man-db.service
+  keyboard-setup.service
+  cloud-init.service
+  cloud-init-main.service
+  cloud-init-local.service
+  cloud-init-network.service
 )
 
 for s in "${SERVICES[@]}"; do
@@ -37,6 +42,10 @@ for s in "${SERVICES[@]}"; do
   fi
 done
 
+# Disable cloud-init after first-boot setup is complete (saves ~4.7s)
+mkdir -p /etc/cloud
+touch /etc/cloud/cloud-init.disabled
+
 # 2. Add Fast Boot Config to /boot/config.txt
 echo "[2/4] Optimizing /boot/config.txt..."
 CONFIG_TXT="/boot/config.txt"
@@ -45,9 +54,11 @@ if [ -f "/boot/firmware/config.txt" ]; then
 fi
 
 if [ -f "$CONFIG_TXT" ]; then
-  # Disable Bluetooth & Wi-Fi radios
+  # Disable Bluetooth radio (saves ~15-20 mA)
   grep -q "dtoverlay=disable-bt" "$CONFIG_TXT" || echo "dtoverlay=disable-bt" >> "$CONFIG_TXT"
-  grep -q "dtoverlay=disable-wifi" "$CONFIG_TXT" || echo "dtoverlay=disable-wifi" >> "$CONFIG_TXT"
+  # Keep Wi-Fi active for development and SSH connectivity. 
+  # In final offline field deployments, uncomment or append 'dtoverlay=disable-wifi'.
+  # grep -q "dtoverlay=disable-wifi" "$CONFIG_TXT" || echo "dtoverlay=disable-wifi" >> "$CONFIG_TXT"
 
   # Fast boot flags
   grep -q "boot_delay=0" "$CONFIG_TXT" || echo "boot_delay=0" >> "$CONFIG_TXT"

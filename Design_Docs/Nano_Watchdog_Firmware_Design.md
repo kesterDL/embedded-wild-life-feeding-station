@@ -512,7 +512,7 @@ The firmware is structured as a non-blocking deterministic Finite State Machine 
 | **D3** | PD3 | `INT1` (Break Beam Int) | Input | IR Break Beam Receiver | Open-collector w/ pullup |
 | **D4** | PD4 | `PCINT20` (Radar In) | Input | RCWL-0516 Doppler Out | 3.3V Logic |
 | **D5** | PD5 | `PCINT21` (Mag Switch) | Input | Magnetic Reed Switch | Pull-up to 5V |
-| **D6** | PD6 | `SHUTDOWN_ACK` | Input | Pi Shutdown Signal (GPIO 25) | 3.3V into 5V (Direct) |
+| **D6** | PD6 | `SHUTDOWN_ACK` | Input | Pi Shutdown Signal (GPIO 25) | 3.3V into 5V (Direct; requires 10kΩ pull-down to GND) |
 | **D7** | PD7 | `PI_STATUS_PULSE` | Input | Pi Heartbeat Pin (GPIO 24) | 3.3V into 5V (Direct) |
 | **D8** | PB0 | `MOSFET_GATE_CTRL` | Output | P-MOSFET Gate Driver (Active LOW) | 5V Output (via Gate BJT) |
 | **A0** | PC0 | `ADC0` (Battery Sense) | Analog In | Battery Divider ($100\text{k}\Omega/27\text{k}\Omega$) | Up to 1.1V (Bandgap Ref) |

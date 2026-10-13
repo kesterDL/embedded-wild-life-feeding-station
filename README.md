@@ -43,12 +43,12 @@ An autonomous, battery-powered edge camera system engineered to monitor a backya
 | :--- | :--- | :--- | :--- |
 | **PIR Motion Trigger** | HC-SR501 OUT | Arduino Nano Pin D2 (`INT0`) | Active-HIGH 3.3V pulse on motion |
 | **MOSFET Gate Control** | Arduino Nano Pin D8 | P-MOSFET Gate Driver | Active-LOW turns ON switched 5V rail |
-| **Shutdown Acknowledgment** | Pi Zero W GPIO 25 (Pin 22) | Arduino Nano Pin D6 | Active-HIGH 3.3V pulse signals OS halt |
+| **Shutdown Acknowledgment** | Pi Zero W GPIO 25 (Pin 22) | Arduino Nano Pin D6 | Active-HIGH 3.3V pulse signals OS halt (requires 10 kΩ pull-down resistor to GND on D6) |
 | **Camera Interface** | Pi Camera Module v2/v3 | Pi Zero W CSI Port | 15-pin ribbon to VideoCore IV ISP |
 | **Storage** | USB Flash Drive | Pi Zero W Micro-USB OTG | Mounted to `/mnt/usb_storage` |
 
 > [!TIP]
-> For a complete, sequential hardware assembly walkthrough, pinout diagrams, and pre-flight multimeter testing instructions, see the [Step-by-Step Hardware Wiring Guide](./step-by-step_wiring%20instructions.md).
+> For a complete, sequential hardware assembly walkthrough, pinout diagrams, and pre-flight multimeter testing instructions, see the [Step-by-Step Hardware Wiring Guide](Design_Docs/step-by-step_wiring%20instructions.md).
 
 ---
 
@@ -125,8 +125,8 @@ clang++ -std=c++17 -DUNIT_TEST \
 - D8 gate defaults to HIGH (Power OFF) and D2/D6 initialize as inputs.
 - PIR motion interrupt transitions the state machine to `STATE_POWER_ON` and pulls D8 LOW.
 - Signals are held active during Pi execution.
-- Receiving D6 ACK triggers a 5-second OS halt settling grace period before cutting power.
-- 60-second failsafe hardware timer force-cuts power if the Pi freezes or fails to ACK.
+- Receiving D6 ACK (with 50 ms debounce/glitch filtering) triggers a 5-second OS halt settling grace period before cutting power.
+- 180-second failsafe hardware timer force-cuts power if the Pi freezes or fails to ACK.
 
 ### 2. Python Media Pipeline Unit Tests (Pi Zero W)
 
