@@ -151,6 +151,7 @@ Connect the Raspberry Pi header pins to the Arduino Nano hardware:
 1. **Switched +5V Power:** Connect P-Channel MOSFET Drain $\to$ Raspberry Pi 5V header pins (Physical Pins 2 or 4).
 2. **Common Ground:** Connect System Ground $\to$ Raspberry Pi GND header pin (Physical Pin 6).
 3. **Shutdown ACK Signal:** Connect Raspberry Pi **GPIO 25** (Physical Pin 22) $\to$ Arduino Nano Pin **D6**.
+4. **Pull-Down Resistor on ACK Line:** Connect a **10 kΩ resistor** between Arduino Nano Pin **D6** and **GND**. *(Critical: Without this pull-down resistor, the high-impedance ATmega328P input pin floats like an antenna, picking up EMI and spuriously triggering premature shutdown before the failsafe timeout)*.
 
 #### 5.4 Safely Halt the Pi for Mounting
 ```bash

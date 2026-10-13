@@ -270,8 +270,9 @@ Timeout tests verify behavior at exact boundaries:
 
 - At `t = 4,999 ms` after shutdown acknowledgment: Power remains asserted (`LOW`).
 - At `t = 5,001 ms` after shutdown acknowledgment: Power is cut off (`HIGH`).
-- At `t = 59,000 ms` without acknowledgment: System waits patiently (`LOW`).
-- At `t = 60,001 ms` without acknowledgment: Hardware failsafe triggers and cuts power (`HIGH`).
+- At `t = 20 ms` on D6 (transient spike < 50 ms): Glitch filter rejects noise; power remains ON.
+- At `t = 179,000 ms` without acknowledgment: System waits patiently (`LOW`).
+- At `t = 180,001 ms` without acknowledgment: Hardware failsafe triggers and cuts power (`HIGH`).
 
 ### 5.4 Fail-Safe Default Hardware State
 
@@ -313,8 +314,11 @@ clang++ -std=c++17 -DUNIT_TEST \
   [PASS] Power remains ON during settling delay
   [PASS] Power cut OFF after settling delay (D8 HIGH)
   [PASS] FSM returns to STATE_SLEEP
-  [PASS] Power still ON at 59 seconds
-  [PASS] Still in STATE_WAIT_SHUTDOWN at 59s
+  [PASS] State remains STATE_WAIT_SHUTDOWN during short noise spike
+  [PASS] State still STATE_WAIT_SHUTDOWN after noise clears
+  [PASS] Power remains ON after transient spike
+  [PASS] Power still ON at 179 seconds
+  [PASS] Still in STATE_WAIT_SHUTDOWN at 179s
   [PASS] Failsafe triggers: D8 HIGH (Power cut)
   [PASS] Returns to STATE_SLEEP after timeout
 All tests completed.

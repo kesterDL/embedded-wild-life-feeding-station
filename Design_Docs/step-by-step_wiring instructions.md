@@ -59,7 +59,7 @@ To maximize battery life, the system keeps the power-hungry Raspberry Pi complet
 | **Raspberry Pi Camera Module** | 1 | CSI v2 or v3 camera with 15-pin ribbon cable. |
 | **HC-SR501 PIR Sensor** | 1 | Passive Infrared motion detector. |
 | **Logic-Level P-Channel MOSFET** | 1 | TO-220 package (e.g., **NDP6020P**, **FQP27P06**, **IRLML6402**). Must turn fully ON at $V_{GS} = -4.5\text{V}$ to $-5\text{V}$. |
-| **10 kΩ Resistor** | 1 | Gate pull-up resistor (holds MOSFET OFF by default). |
+| **10 kΩ Resistor** | 2 | 1x Gate pull-up (holds MOSFET OFF); 1x Nano D6 pull-down (prevents floating pin / EMI noise). |
 | **220 Ω to 1 kΩ Resistor** | 1 | Gate current-limiting resistor (protects Arduino pin D8). |
 | **5V USB Power Bank** | 1 | Battery source with always-on / low-current mode. |
 | **Micro-USB OTG Flash Drive** | 1 | Removable FAT32/exFAT storage for captured videos. |
@@ -94,7 +94,7 @@ Look at the front of the MOSFET (where the part number is printed, metal heatsin
 - **`5V`**: Always-on regulated 5V power input.
 - **`GND`**: System common ground.
 - **`D2` (`INT0`)**: Interrupt 0 input for PIR motion detection (Active HIGH 3.3V pulse).
-- **`D6`**: Input for Raspberry Pi shutdown acknowledgment pulse (Active HIGH 3.3V pulse).
+- **`D6`**: Input for Raspberry Pi shutdown acknowledgment pulse (Active HIGH 3.3V pulse; requires 10 kΩ pull-down resistor to GND to eliminate floating input noise).
 - **`D8`**: Active-LOW output to MOSFET Gate (`LOW` = Power ON, `HIGH` = Power OFF).
 - **`D13`**: Onboard activity LED.
 
@@ -163,7 +163,14 @@ Remove the plastic white Fresnel dome if needed to check the pin labels under th
                                                                                            │
 Signal Lines:                                                                              │
   [PIR OUT]     ───────────────────────────────────────────► [Nano Pin D2]                 │
-  [Pi GPIO 25]  ───────────────────────────────────────────► [Nano Pin D6]                 │
+  [Pi GPIO 25]  ───────────────┬───────────────────────────► [Nano Pin D6]                 │
+                               │                                                           │
+                       ┌───────┴───────┐                                                   │
+                       │ 10kΩ Pull-down│                                                   │
+                       │   Resistor    │                                                   │
+                       └───────┬───────┘                                                   │
+                               ▼                                                           │
+                         [Common GND]                                                      │
                                                                                            │
 GND Rail (Common Reference)                                                                │
   [Battery GND] ───┬───────────────────────┬────────────────────────┬──────────────────────┘
@@ -221,9 +228,10 @@ Follow these steps in strict numerical order on your breadboard or proto-board.
 
 ---
 
-### Step 6: Wire the Shutdown Acknowledgment Line
+### Step 6: Wire the Shutdown Acknowledgment Line & Pull-Down Resistor
 1. Connect a jumper wire from **Raspberry Pi Zero W Pin 22 (`GPIO 25`)** to **Arduino Nano Pin `D6`**.
-   - *Why:* After capturing the 20-second video and safely flushing the USB flash drive buffers, the Pi's Python daemon sends a 3.3V pulse on GPIO 25. The Arduino detects this on D6, waits a 5-second grace window for Linux to halt cleanly, and then de-asserts D8 (cutting power).
+2. Connect a **$10\text{ k}\Omega$ resistor** between **Arduino Nano Pin `D6`** and **Breadboard GND**.
+   - *Why:* After capturing the 20-second video and safely flushing the USB flash drive buffers, the Pi's Python daemon sends a 3.3V pulse on GPIO 25. The ATmega328P pin D6 is a high-impedance input. Without an external pull-down resistor, a disconnected or floating wire acts as an antenna picking up stray EMI/electrostatic noise, falsely triggering the shutdown sequence prematurely. The 10 kΩ resistor holds D6 firmly at 0V until the Pi actively asserts GPIO 25. The Arduino detects this pulse on D6, waits a 5-second grace window for Linux to halt cleanly, and then de-asserts D8 (cutting power).
 
 ---
 
@@ -244,6 +252,7 @@ Follow these steps in strict numerical order on your breadboard or proto-board.
 | **11**| MOSFET **Drain (D)** | Pi Zero W **Pin 2 or 4 (5V)**| Switched 5V Power Rail | Energizes Pi on demand (~250 mA) |
 | **12**| Breadboard GND | Pi Zero W **Pin 6 or 9 (GND)**| Pi Zero Ground | Common ground |
 | **13**| Pi Zero W **Pin 22 (GPIO 25)**| Arduino Nano `D6` | Shutdown ACK Signal | 3.3V active-high pulse signals OS halt |
+| **14**| Arduino Nano `D6` | Breadboard GND Bus Rail | Shutdown ACK Pull-down | 10 kΩ pull-down resistor prevents floating pin / EMI noise |
 
 ---
 

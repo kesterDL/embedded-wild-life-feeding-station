@@ -256,7 +256,7 @@ To guarantee network fault tolerance (Non-Functional Requirement 4.3), video fil
 | **Pin 10** | GPIO 15 | `UART0_RXD` | Nano Pin D1 (TXD) via 1k/2k Divider | 3.3V Logic Safe |
 | **Pin 16** | GPIO 23 | Reserved | Future Nano Interrupt Line | 3.3V Logic |
 | **Pin 18** | GPIO 24 | `PI_STATUS_HEARTBEAT` | Nano Pin D7 | 3.3V into Nano D7 |
-| **Pin 22** | GPIO 25 | `SHUTDOWN_ACK` | Nano Pin D6 | 3.3V into Nano D6 |
+| **Pin 22** | GPIO 25 | `SHUTDOWN_ACK` | Nano Pin D6 | 3.3V into Nano D6 (requires 10kΩ pull-down to GND on D6) |
 
 ### 8.2 UART Protocol & Telemetry Schema
 
@@ -337,7 +337,7 @@ To satisfy **Functional Requirement 3.4 (Asynchronous Live Feed)**, the system i
 1. **Stage 1: Standalone Hardware H.264 Benchmark**
    - Verify `Picamera2` pipeline on Pi Zero W. Confirm 1080p30 H.264 recording produces $<15\%$ CPU utilization and zero dropped frames.
 2. **Stage 2: Power Gate & GPIO Handshake Timing**
-   - Wire Pi GPIO 24/25 to Nano pins D7/D6.
+   - Wire Pi GPIO 24/25 to Nano pins D7/D6 (ensure 10 kΩ pull-down resistor to GND on D6).
    - Measure full cycle: Nano MOSFET latch -> Pi boot -> 20s recording -> clean OS halt -> Nano power cut. Verify zero filesystem corruption over 50 consecutive cycles.
 3. **Stage 3: Offline Ring Buffer & Quota Eviction Test**
    - Disable Wi-Fi. Trigger 20 consecutive recordings. Verify all clips store cleanly in `/data/archive/` and FIFO eviction operates when quota is exceeded.

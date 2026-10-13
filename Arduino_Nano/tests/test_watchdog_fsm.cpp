@@ -61,6 +61,9 @@ void test_shutdown_ack_and_clean_poweroff() {
     // Pi signals shutdown complete: D6 goes HIGH
     MockArduinoPlatform::instance().setPinValue(PIN_SHUTDOWN_ACK, HIGH);
     fsm.update();
+    // Advance past debounce window (50 ms)
+    MockArduinoPlatform::instance().advanceTimeMs(SHUTDOWN_ACK_DEBOUNCE_MS);
+    fsm.update();
     run_test("State transitions to STATE_POWER_OFF_DELAY on ACK", fsm.getState() == WatchdogState::STATE_POWER_OFF_DELAY);
 
     // Advance 4999 ms (delay period not yet finished)
@@ -75,6 +78,29 @@ void test_shutdown_ack_and_clean_poweroff() {
     run_test("FSM returns to STATE_SLEEP", fsm.getState() == WatchdogState::STATE_SLEEP);
 }
 
+void test_shutdown_ack_glitch_filtering() {
+    MockArduinoPlatform::instance().reset();
+    WatchdogFSM fsm;
+    fsm.init();
+    fsm.onMotionDetected();
+    fsm.update(); // STATE_WAIT_SHUTDOWN
+
+    // Transient noise spike on D6 for 20 ms (< SHUTDOWN_ACK_DEBOUNCE_MS)
+    MockArduinoPlatform::instance().setPinValue(PIN_SHUTDOWN_ACK, HIGH);
+    fsm.update();
+    MockArduinoPlatform::instance().advanceTimeMs(20);
+    fsm.update();
+    run_test("State remains STATE_WAIT_SHUTDOWN during short noise spike", fsm.getState() == WatchdogState::STATE_WAIT_SHUTDOWN);
+
+    // Noise spike clears back to LOW
+    MockArduinoPlatform::instance().setPinValue(PIN_SHUTDOWN_ACK, LOW);
+    fsm.update();
+    MockArduinoPlatform::instance().advanceTimeMs(100);
+    fsm.update();
+    run_test("State still STATE_WAIT_SHUTDOWN after noise clears", fsm.getState() == WatchdogState::STATE_WAIT_SHUTDOWN);
+    run_test("Power remains ON after transient spike", MockArduinoPlatform::instance().getPinValue(PIN_MOSFET_GATE) == LOW);
+}
+
 void test_failsafe_timeout_force_cuts_power() {
     MockArduinoPlatform::instance().reset();
     WatchdogFSM fsm;
@@ -82,13 +108,13 @@ void test_failsafe_timeout_force_cuts_power() {
     fsm.onMotionDetected();
     fsm.update(); // STATE_WAIT_SHUTDOWN
 
-    // Simulate 119 seconds elapsing without ACK
-    MockArduinoPlatform::instance().advanceTimeMs(119000);
+    // Simulate 179 seconds elapsing without ACK
+    MockArduinoPlatform::instance().advanceTimeMs(179000);
     fsm.update();
-    run_test("Power still ON at 119 seconds", MockArduinoPlatform::instance().getPinValue(PIN_MOSFET_GATE) == LOW);
-    run_test("Still in STATE_WAIT_SHUTDOWN at 119s", fsm.getState() == WatchdogState::STATE_WAIT_SHUTDOWN);
+    run_test("Power still ON at 179 seconds", MockArduinoPlatform::instance().getPinValue(PIN_MOSFET_GATE) == LOW);
+    run_test("Still in STATE_WAIT_SHUTDOWN at 179s", fsm.getState() == WatchdogState::STATE_WAIT_SHUTDOWN);
 
-    // Advance to 120,001 ms (exceeding failsafe limit)
+    // Advance to 180,001 ms (exceeding failsafe limit)
     MockArduinoPlatform::instance().advanceTimeMs(1001);
     fsm.update();
     run_test("Failsafe triggers: D8 HIGH (Power cut)", MockArduinoPlatform::instance().getPinValue(PIN_MOSFET_GATE) == HIGH);
@@ -100,6 +126,7 @@ int main() {
     test_initial_pin_configuration();
     test_motion_detection_triggers_power_on();
     test_shutdown_ack_and_clean_poweroff();
+    test_shutdown_ack_glitch_filtering();
     test_failsafe_timeout_force_cuts_power();
     std::cout << "All tests completed." << std::endl;
     return 0;
