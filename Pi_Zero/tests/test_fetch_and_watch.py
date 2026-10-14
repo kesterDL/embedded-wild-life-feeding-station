@@ -154,6 +154,11 @@ class TestFetchAndWatch(unittest.TestCase):
         with open(dot_file, "wb") as f:
             f.write(b"metadata")
 
+        # 5. Lifecycle metrics log
+        log_file = os.path.join(src_dir, "lifecycle.log")
+        with open(log_file, "w") as f:
+            f.write("timestamp,uptime_s,record_s,mux_s,total_cycle_s,status,video_file,throttled\n")
+
         synced, converted = sync_recordings(src_dir, dest_dir)
         self.assertEqual(synced, 1)
         self.assertEqual(converted, 1)
@@ -162,6 +167,8 @@ class TestFetchAndWatch(unittest.TestCase):
         self.assertTrue(os.path.exists(os.path.join(dest_dir, "clip_20261009_185839.mp4")))
         # Verify temp H.264 was converted to clean MP4 in dest
         self.assertTrue(os.path.exists(os.path.join(dest_dir, "clip_20261009_185847.mp4")))
+        # Verify lifecycle.log was copied to dest
+        self.assertTrue(os.path.exists(os.path.join(dest_dir, "lifecycle.log")))
         # Verify 0-byte and dot files were not copied
         self.assertFalse(os.path.exists(os.path.join(dest_dir, "clip_20261009_185905.mp4")))
         self.assertFalse(os.path.exists(os.path.join(dest_dir, "._clip_20261009_185839.mp4")))

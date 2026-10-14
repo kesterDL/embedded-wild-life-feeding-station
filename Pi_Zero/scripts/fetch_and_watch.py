@@ -281,6 +281,19 @@ def sync_recordings(
                 else:
                     print(f"  [WARNING] Failed to convert {name} to MP4")
 
+    # 3. Also sync lifecycle.log if present in src_dir or parent volume
+    log_candidates = [
+        os.path.join(src_dir, "lifecycle.log"),
+        os.path.join(os.path.dirname(src_dir), "lifecycle.log"),
+    ]
+    for log_c in log_candidates:
+        if os.path.exists(log_c) and os.path.isfile(log_c):
+            dest_log = os.path.join(dest_dir, "lifecycle.log")
+            if not os.path.exists(dest_log) or os.path.getmtime(log_c) > os.path.getmtime(dest_log):
+                print(f"  ✓ Synced lifecycle metrics log to: {dest_log}")
+                shutil.copy2(log_c, dest_log)
+            break
+
     return synced_count, converted_count
 
 

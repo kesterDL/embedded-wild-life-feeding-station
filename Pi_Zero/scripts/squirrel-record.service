@@ -12,7 +12,7 @@ Environment="PYTHONPATH=/opt/squirrelfeeder"
 ExecStart=/usr/bin/python3 -m Pi_Zero.src.orchestrator
 StandardOutput=journal+console
 StandardError=journal+console
-TimeoutSec=45
+TimeoutSec=120
 
 [Install]
 WantedBy=basic.target

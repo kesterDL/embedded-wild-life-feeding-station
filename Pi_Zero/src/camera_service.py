@@ -7,6 +7,7 @@ hardware-encoded 1080p H.264 video packaged into MP4.
 import os
 import shutil
 import subprocess
+import time
 from typing import List, Optional
 
 
@@ -29,6 +30,8 @@ class CameraService:
         self.fps = fps
         self.duration_ms = duration_ms
         self.binary = binary
+        self.last_record_duration: float = 0.0
+        self.last_mux_duration: float = 0.0
 
     def resolve_binary(self) -> str:
         """Determines whether rpicam-vid or legacy libcamera-vid is present."""
@@ -82,6 +85,7 @@ class CameraService:
 
         cmd = self.build_command(raw_target)
         try:
+            t0 = time.time()
             result = subprocess.run(
                 cmd,
                 stdout=subprocess.PIPE,
@@ -89,6 +93,7 @@ class CameraService:
                 text=True,
                 check=False
             )
+            self.last_record_duration = round(time.time() - t0, 2)
             if result.returncode != 0:
                 raise CameraError(
                     f"Camera recording failed (code {result.returncode}): {result.stderr}"
@@ -101,12 +106,14 @@ class CameraService:
                 else:
                     mux_cmd = [ffmpeg, "-framerate", str(self.fps), "-i", raw_target, "-c", "copy", "-y", output_path]
 
+                t1 = time.time()
                 mux_res = subprocess.run(
                     mux_cmd,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     check=False
                 )
+                self.last_mux_duration = round(time.time() - t1, 2)
                 try:
                     if os.path.exists(raw_target):
                         os.remove(raw_target)
