@@ -32,35 +32,45 @@ class StorageManager:
     ):
         self.directory_name = directory_name
         self.mount_point = mount_point
-        # If use_sd_card is not explicitly specified:
-        # Default to True when mount_point is None (standard SD card operation).
-        # Default to False when mount_point is explicitly specified (external USB mode).
-        if use_sd_card is None:
-            self.use_sd_card = (mount_point is None)
-        else:
-            self.use_sd_card = use_sd_card
+        # If use_sd_card is True: explicitly targets the FAT boot partition.
+        # If mount_point is specified: external USB storage mode.
+        # Default (mount_point is None and use_sd_card is None/False):
+        # targets the 120+ GB ext4 root partition (/home/david/Wild_Life_Recordings).
+        self.use_sd_card = bool(use_sd_card)
 
         self.recordings_dir = self.resolve_recordings_dir()
 
     def resolve_recordings_dir(self) -> str:
         """Determines the target directory for recordings.
 
-        When targeting the SD card, locates the FAT boot partition visible to macOS:
-        1. /boot/firmware/Wild_Life_Recordings (Raspberry Pi OS Bookworm)
-        2. /boot/Wild_Life_Recordings (Raspberry Pi OS Bullseye / legacy)
-        3. /Volumes/boot/Wild_Life_Recordings (macOS host environment with SD inserted)
-        4. Fallback to ./Wild_Life_Recordings (local/testing environment)
+        1. External USB storage: when mount_point is explicitly specified.
+        2. Explicit SD card FAT boot partition: only when use_sd_card is True.
+        3. Ext4 root partition (default): utilizes the full 120+ GB root filesystem
+           at /home/david/Wild_Life_Recordings or /var/media/Wild_Life_Recordings.
+        4. Fallback to ./Wild_Life_Recordings for local host / testing.
         """
-        if not self.use_sd_card and self.mount_point:
-            return os.path.join(self.mount_point, self.directory_name)
-
-        # Priority search on SD card FAT boot partition mount points
-        for candidate_base in ["/boot/firmware", "/boot", "/Volumes/boot", "/Volumes/bootfs"]:
-            if os.path.exists(candidate_base) and os.path.isdir(candidate_base):
-                return os.path.join(candidate_base, self.directory_name)
-
         if self.mount_point:
             return os.path.join(self.mount_point, self.directory_name)
+
+        # Explicit request for SD card FAT boot partition
+        if self.use_sd_card:
+            for candidate_base in ["/boot/firmware", "/boot", "/Volumes/boot", "/Volumes/bootfs"]:
+                if os.path.exists(candidate_base) and os.path.isdir(candidate_base):
+                    return os.path.join(candidate_base, self.directory_name)
+
+        # Standard ext4 rootfs partition location (120+ GB storage)
+        for ext4_candidate in ["/home/david", "/var/media"]:
+            if os.path.exists(ext4_candidate) and os.path.isdir(ext4_candidate):
+                target = os.path.join(ext4_candidate, self.directory_name)
+                # If target is a legacy symlink pointing to the small bootfs, remove it
+                if os.path.islink(target):
+                    try:
+                        dest = os.readlink(target)
+                        if "boot" in dest:
+                            os.unlink(target)
+                    except OSError:
+                        pass
+                return target
 
         # Fallback for development / desktop runs
         return os.path.abspath(self.directory_name)
@@ -90,11 +100,11 @@ class StorageManager:
         Raises:
             StorageNotFoundError: If external storage device is required but not present.
         """
-        if self.use_sd_card:
+        if self.use_sd_card or not self.mount_point:
             os.makedirs(self.recordings_dir, exist_ok=True)
             return True
 
-        # External USB Storage Mode
+        # External USB Storage Mode (when mount_point is specified)
         device = self.find_usb_device()
         if not device:
             raise StorageNotFoundError(
