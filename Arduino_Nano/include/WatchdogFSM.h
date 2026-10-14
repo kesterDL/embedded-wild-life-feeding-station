@@ -22,9 +22,11 @@ constexpr uint8_t PIN_STATUS_LED = 13; // Onboard LED for status indication
 
 // Hardware Timers & Timeouts
 constexpr unsigned long FAILSAFE_TIMEOUT_MS =
-    60000UL; // 60s max active runtime failsafe
+    180000UL; // 180s max active runtime failsafe
 constexpr unsigned long SHUTDOWN_DELAY_MS =
     5000UL; // 5s grace period for OS halt after ACK
+constexpr unsigned long SHUTDOWN_ACK_DEBOUNCE_MS =
+    50UL; // 50ms sustained pulse required to reject EMI noise spikes
 
 enum class WatchdogState : uint8_t {
   STATE_SLEEP = 0,
@@ -55,6 +57,8 @@ private:
   WatchdogState m_state;
   unsigned long m_powerOnTime;
   unsigned long m_ackReceivedTime;
+  unsigned long m_ackHighStartTime;
+  bool m_ackHighDetected;
 };
 
 #endif // WATCHDOG_FSM_H

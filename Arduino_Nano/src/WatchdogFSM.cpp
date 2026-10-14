@@ -3,7 +3,9 @@
 WatchdogFSM::WatchdogFSM() 
     : m_state(WatchdogState::STATE_SLEEP),
       m_powerOnTime(0),
-      m_ackReceivedTime(0) {}
+      m_ackReceivedTime(0),
+      m_ackHighStartTime(0),
+      m_ackHighDetected(false) {}
 
 void WatchdogFSM::init() {
     // Configure power-switching gate: Output, default HIGH (Power OFF)
@@ -21,6 +23,8 @@ void WatchdogFSM::init() {
     m_state = WatchdogState::STATE_SLEEP;
     m_powerOnTime = 0;
     m_ackReceivedTime = 0;
+    m_ackHighStartTime = 0;
+    m_ackHighDetected = false;
 }
 
 void WatchdogFSM::applyPower() {
@@ -86,17 +90,28 @@ void WatchdogFSM::update() {
         case WatchdogState::STATE_POWER_ON:
             applyPower();
             m_powerOnTime = millis();
+            m_ackHighStartTime = 0;
+            m_ackHighDetected = false;
             m_state = WatchdogState::STATE_WAIT_SHUTDOWN;
             break;
 
         case WatchdogState::STATE_WAIT_SHUTDOWN:
-            // Check for graceful shutdown acknowledgment from Pi Zero W
+            // Check for graceful shutdown acknowledgment from Pi Zero W with noise/glitch filter
             if (digitalRead(PIN_SHUTDOWN_ACK) == HIGH) {
-                m_ackReceivedTime = millis();
-                m_state = WatchdogState::STATE_POWER_OFF_DELAY;
-            } 
+                if (!m_ackHighDetected) {
+                    m_ackHighDetected = true;
+                    m_ackHighStartTime = millis();
+                } else if ((millis() - m_ackHighStartTime) >= SHUTDOWN_ACK_DEBOUNCE_MS) {
+                    m_ackReceivedTime = millis();
+                    m_state = WatchdogState::STATE_POWER_OFF_DELAY;
+                }
+            } else {
+                m_ackHighDetected = false; // Glitch filter: reset if signal drops LOW
+            }
+
             // Enforce hardware failsafe timeout to prevent battery drain on hung OS
-            else if ((millis() - m_powerOnTime) >= FAILSAFE_TIMEOUT_MS) {
+            if (m_state == WatchdogState::STATE_WAIT_SHUTDOWN &&
+                (millis() - m_powerOnTime) >= FAILSAFE_TIMEOUT_MS) {
                 cutPower();
                 m_state = WatchdogState::STATE_SLEEP;
             }

@@ -23,7 +23,7 @@ The Arduino Nano solves this problem:
 | Pin | Constant Name | Direction | Signal Type | Description |
 | :--- | :--- | :--- | :--- | :--- |
 | **`D2`** | `PIN_PIR_INTERRUPT` | `INPUT` | Active-HIGH 3.3V pulse (`INT0`) | External interrupt line triggered by HC-SR501 PIR sensor on motion detection. |
-| **`D6`** | `PIN_SHUTDOWN_ACK` | `INPUT` | Active-HIGH 3.3V pulse | Handshake input from Pi Zero W (`GPIO 25`) signaling video recording is saved and OS is halting. |
+| **`D6`** | `PIN_SHUTDOWN_ACK` | `INPUT` | Active-HIGH 3.3V pulse | Handshake input from Pi Zero W (`GPIO 25`) signaling video recording is saved and OS is halting (requires 10 kΩ pull-down resistor to GND on D6). |
 | **`D8`** | `PIN_MOSFET_GATE` | `OUTPUT` | Active-LOW logic (5V / 0V) | Controls the high-side P-Channel MOSFET. `LOW` = Power ON to Pi; `HIGH` = Power Cut OFF. |
 | **`D13`**| `PIN_STATUS_LED` | `OUTPUT` | Active-HIGH | Onboard LED indicator. Lit when Pi is energized; unlit during sleep. |
 
@@ -55,14 +55,17 @@ classDiagram
 
     class HardwareTimers {
         <<constants>>
-        +unsigned long FAILSAFE_TIMEOUT_MS = 60000UL
+        +unsigned long FAILSAFE_TIMEOUT_MS = 180000UL
         +unsigned long SHUTDOWN_DELAY_MS = 5000UL
+        +unsigned long SHUTDOWN_ACK_DEBOUNCE_MS = 50UL
     }
 
     class WatchdogFSM {
         -WatchdogState m_state
         -unsigned long m_powerOnTime
         -unsigned long m_ackReceivedTime
+        -unsigned long m_ackHighStartTime
+        -bool m_ackHighDetected
         +WatchdogFSM()
         +init() void
         +update() void
@@ -193,11 +196,11 @@ sequenceDiagram
 - **Monitoring Loop:** Evaluated on every iteration of `watchdog.update()`.
 - **Branch A — Graceful Handshake:**
   - Polls `PIN_SHUTDOWN_ACK` (`D6`).
-  - When the Pi asserts `HIGH` (3.3V from GPIO 25), the Nano acknowledges the impending shutdown.
+  - When the Pi asserts `HIGH` (3.3V from GPIO 25) sustained for at least 50 ms (`SHUTDOWN_ACK_DEBOUNCE_MS` glitch filter), the Nano acknowledges the impending shutdown.
   - Captures acknowledgment timestamp: `m_ackReceivedTime = millis()`.
   - Transitions to `STATE_POWER_OFF_DELAY`.
 - **Branch B — Hardware Failsafe Protection:**
-  - Evaluates `(millis() - m_powerOnTime) >= FAILSAFE_TIMEOUT_MS` (60,000 ms).
+  - Evaluates `(millis() - m_powerOnTime) >= FAILSAFE_TIMEOUT_MS` (180,000 ms).
   - If the Raspberry Pi fails to boot, encounters kernel panic, suffers SD card corruption, or hangs, the timer trips.
   - Calls `cutPower()` immediately (`D8` set to `HIGH`, `D13` set to `LOW`).
   - Returns directly to `STATE_SLEEP`, protecting the battery against total drain.
