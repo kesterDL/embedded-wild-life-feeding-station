@@ -29,13 +29,13 @@ def find_local_boot_partitions() -> List[str]:
     ]
     found = []
     for c in candidates:
-        if os.path.isdir(c) and os.access(c, os.W_OK):
+        if os.path.isdir(c):
             found.append(c)
 
     # Dynamic search for any other mounted volume on macOS containing Pi boot files
     if os.path.isdir("/Volumes"):
         for vol in glob.glob("/Volumes/*"):
-            if vol not in found and os.path.isdir(vol) and os.access(vol, os.W_OK):
+            if vol not in found and os.path.isdir(vol):
                 if os.path.exists(os.path.join(vol, "config.txt")) or os.path.exists(
                     os.path.join(vol, "cmdline.txt")
                 ):
@@ -52,18 +52,43 @@ def get_maintenance_status_local(boot_dir: str) -> bool:
 def set_maintenance_local(boot_dir: str, enable: bool) -> bool:
     """Enables or disables maintenance mode on the given local boot directory."""
     success = True
+    needs_sudo = not os.access(boot_dir, os.W_OK)
     for name in FLAG_NAMES:
         target = os.path.join(boot_dir, name)
         try:
             if enable:
-                with open(target, "w") as f:
-                    f.write("# Maintenance mode flag: prevents auto-shutdown\n")
+                if needs_sudo:
+                    res = subprocess.run(["sudo", "touch", target], check=False)
+                    if res.returncode != 0:
+                        success = False
+                else:
+                    with open(target, "w") as f:
+                        f.write("# Maintenance mode flag: prevents auto-shutdown\n")
             else:
                 if os.path.exists(target):
-                    os.remove(target)
+                    if needs_sudo:
+                        res = subprocess.run(["sudo", "rm", "-f", target], check=False)
+                        if res.returncode != 0:
+                            success = False
+                    else:
+                        os.remove(target)
         except OSError as e:
             print(f"[ERROR] Failed to update {target}: {e}", file=sys.stderr)
             success = False
+
+    # Also clean ~/Wild_Life_Recordings if flags were created there
+    if not enable:
+        for home_dir in [
+            os.path.expanduser("~/Wild_Life_Recordings"),
+            os.path.expanduser("~/SquirrelFeeder/Wild_Life_Recordings")
+        ]:
+            for name in FLAG_NAMES:
+                flag = os.path.join(home_dir, name)
+                if os.path.exists(flag):
+                    try:
+                        os.remove(flag)
+                    except OSError:
+                        pass
 
     # Flush disk buffers so removing the SD card doesn't lose the flag
     try:
@@ -81,17 +106,17 @@ def set_maintenance_remote(host: str, enable: bool) -> bool:
     """Enables or disables maintenance mode on a remote Raspberry Pi via SSH."""
     if enable:
         cmd_str = (
-            "touch /boot/firmware/maintenance /boot/firmware/no_shutdown 2>/dev/null || "
-            "touch /boot/maintenance /boot/no_shutdown"
+            "sudo touch /boot/firmware/maintenance /boot/firmware/no_shutdown 2>/dev/null || "
+            "sudo touch /boot/maintenance /boot/no_shutdown"
         )
     else:
         cmd_str = (
-            "rm -f /boot/firmware/maintenance /boot/firmware/no_shutdown "
+            "sudo rm -f /boot/firmware/maintenance /boot/firmware/no_shutdown "
             "/boot/maintenance /boot/no_shutdown "
             "~/Wild_Life_Recordings/maintenance ~/Wild_Life_Recordings/no_shutdown 2>/dev/null || true"
         )
 
-    res = subprocess.run(["ssh", "-o", "ConnectTimeout=5", host, cmd_str], check=False)
+    res = subprocess.run(["ssh", "-tt", "-o", "ConnectTimeout=5", host, cmd_str], check=False)
     return res.returncode == 0
 
 

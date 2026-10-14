@@ -57,8 +57,17 @@ def find_mounted_sd_card_dir() -> Optional[str]:
 import re
 
 
-def fetch_from_pi(host: str, dest_dir: str, remote_dir: Optional[str] = None):
-    """Downloads recordings from the remote Raspberry Pi via rsync or scp."""
+def fetch_from_pi(
+    host: str,
+    dest_dir: str,
+    remote_dir: Optional[str] = None,
+    delete_source: bool = True,
+):
+    """Downloads recordings from the remote Raspberry Pi via rsync or scp.
+
+    If delete_source is True, removes confirmed transferred recordings from the remote
+    Wild_Life_Recordings directory after a successful sync.
+    """
     os.makedirs(dest_dir, exist_ok=True)
     rsync_bin = shutil.which("rsync")
 
@@ -68,10 +77,22 @@ def fetch_from_pi(host: str, dest_dir: str, remote_dir: Optional[str] = None):
         print(f"=== Fetching recordings from {host}:~/{candidate}/ ===")
         if rsync_bin:
             print("Syncing recordings via rsync (incremental, preserves timestamps)...")
-            cmd = [rsync_bin, "-avz", "--copy-links", f"{host}:~/{candidate}/", f"{dest_dir}/"]
+            cmd = [rsync_bin, "-avz", "--copy-links"]
+            if delete_source:
+                cmd.append("--remove-source-files")
+            cmd.extend([f"{host}:~/{candidate}/", f"{dest_dir}/"])
             res = subprocess.run(cmd, check=False)
             if res.returncode == 0:
                 print("✓ Files synced successfully via rsync.")
+                if delete_source:
+                    cleanup_cmd = [
+                        "ssh",
+                        "-o", "ConnectTimeout=5",
+                        host,
+                        f"rm -f ~/{candidate}/*.mp4 ~/{candidate}/*.h264 ~/{candidate}/*.mov ~/{candidate}/*.mkv 2>/dev/null || true"
+                    ]
+                    subprocess.run(cleanup_cmd, check=False)
+                    print(f"✓ Cleaned up confirmed recordings from {host}:~/{candidate}/.")
                 return
 
         # Fallback to scp command preserving timestamps
@@ -80,6 +101,15 @@ def fetch_from_pi(host: str, dest_dir: str, remote_dir: Optional[str] = None):
         res = subprocess.run(cmd, check=False)
         if res.returncode == 0:
             print("✓ Files fetched successfully.")
+            if delete_source:
+                cleanup_cmd = [
+                    "ssh",
+                    "-o", "ConnectTimeout=5",
+                    host,
+                    f"rm -f ~/{candidate}/*.mp4 ~/{candidate}/*.h264 ~/{candidate}/*.mov ~/{candidate}/*.mkv 2>/dev/null || true"
+                ]
+                subprocess.run(cleanup_cmd, check=False)
+                print(f"✓ Cleaned up confirmed recordings from {host}:~/{candidate}/.")
             return
 
     print("Note: Finished attempting to fetch recordings.")
@@ -204,6 +234,7 @@ def sync_recordings(
     dest_dir: str,
     convert_raw: bool = True,
     fps: int = 25,
+    delete_source: bool = True,
 ) -> tuple:
     """Syncs recordings from src_dir to dest_dir and converts non-empty raw H.264 streams.
 
@@ -212,6 +243,7 @@ def sync_recordings(
         dest_dir: Local destination directory to copy/convert files into.
         convert_raw: If True, packages lingering .h264 / _temp.h264 into .mp4.
         fps: Framerate for packaging H.264 streams into MP4 container.
+        delete_source: If True, deletes confirmed transferred recordings from src_dir.
 
     Returns:
         tuple (synced_count, converted_count)
@@ -222,6 +254,7 @@ def sync_recordings(
 
     synced_count = 0
     converted_count = 0
+    deleted_count = 0
 
     valid_containers = {".mp4", ".mov", ".mkv"}
 
@@ -246,6 +279,17 @@ def sync_recordings(
                 shutil.copy2(entry.path, dest_path)
                 synced_count += 1
 
+            # Confirm file exists and size matches in destination before deleting from source
+            if delete_source and os.path.exists(dest_path) and os.path.getsize(dest_path) == entry.stat().st_size:
+                try:
+                    os.remove(entry.path)
+                    deleted_count += 1
+                    apple_double = os.path.join(src_dir, f"._{name}")
+                    if os.path.exists(apple_double):
+                        os.remove(apple_double)
+                except OSError as e:
+                    print(f"  [WARNING] Could not delete source file {entry.path}: {e}")
+
     # 2. Convert non-empty raw streams (.h264, _temp.h264)
     if convert_raw:
         for entry in entries:
@@ -259,6 +303,11 @@ def sync_recordings(
                 except OSError:
                     continue
                 if size == 0:
+                    if delete_source:
+                        try:
+                            os.remove(entry.path)
+                        except OSError:
+                            pass
                     continue
 
                 if name.endswith("_temp.h264"):
@@ -269,17 +318,33 @@ def sync_recordings(
                     target_name = f"{base}.mp4"
 
                 dest_mp4 = os.path.join(dest_dir, target_name)
+                converted = False
                 # If target mp4 already exists and is non-empty, skip
-                if os.path.exists(dest_mp4) and os.path.getsize(dest_mp4) > 0:
-                    continue
-
-                size_mb = size / (1024 * 1024)
-                print(f"  Packaging raw stream: {name} ({size_mb:.2f} MB) -> {target_name}...")
-                if package_to_smooth_mp4(entry.path, dest_mp4, fps=fps):
-                    print(f"  ✓ Converted to {target_name}")
-                    converted_count += 1
+                if not (os.path.exists(dest_mp4) and os.path.getsize(dest_mp4) > 0):
+                    size_mb = size / (1024 * 1024)
+                    print(f"  Packaging raw stream: {name} ({size_mb:.2f} MB) -> {target_name}...")
+                    if package_to_smooth_mp4(entry.path, dest_mp4, fps=fps):
+                        print(f"  ✓ Converted to {target_name}")
+                        converted_count += 1
+                        converted = True
+                    else:
+                        print(f"  [WARNING] Failed to convert {name} to MP4")
                 else:
-                    print(f"  [WARNING] Failed to convert {name} to MP4")
+                    converted = True
+
+                # Confirm destination MP4 exists and is non-empty before deleting raw source
+                if delete_source and converted and os.path.exists(dest_mp4) and os.path.getsize(dest_mp4) > 0:
+                    try:
+                        os.remove(entry.path)
+                        deleted_count += 1
+                        apple_double = os.path.join(src_dir, f"._{name}")
+                        if os.path.exists(apple_double):
+                            os.remove(apple_double)
+                    except OSError as e:
+                        print(f"  [WARNING] Could not delete source file {entry.path}: {e}")
+
+    if delete_source and deleted_count > 0:
+        print(f"  ✓ Cleaned up {deleted_count} transferred recording(s) from SD card.")
 
     # 3. Also sync lifecycle.log if present in src_dir or parent volume
     log_candidates = [
@@ -337,6 +402,10 @@ def convert_lingering_raw_streams(directory: str, fps: int = 25) -> int:
             if package_to_smooth_mp4(entry.path, dest_mp4, fps=fps):
                 print(f"  ✓ Converted to {target_name}")
                 converted_count += 1
+                try:
+                    os.remove(entry.path)
+                except OSError:
+                    pass
 
     return converted_count
 
@@ -412,6 +481,13 @@ def main():
         default=None,
         help="Open a specific video file path instead of newest"
     )
+    parser.add_argument(
+        "--keep", "--no-delete",
+        dest="delete_source",
+        action="store_false",
+        default=True,
+        help="Keep source recordings in Wild_Life_Recordings after transferring (default: delete confirmed transferred files)."
+    )
 
     args = parser.parse_args()
 
@@ -427,13 +503,17 @@ def main():
         if sd_card_dir and not args.force_fetch:
             print(f"✓ Found Raspberry Pi SD Card mounted at: {sd_card_dir}")
             print(f"Syncing recordings from SD card to local directory ({local_dir})...")
-            synced_count, converted_count = sync_recordings(sd_card_dir, local_dir)
+            synced_count, converted_count = sync_recordings(
+                sd_card_dir, local_dir, delete_source=args.delete_source
+            )
             print(f"✓ Sync complete: {synced_count} file(s) copied, {converted_count} raw stream(s) converted to MP4.\n")
             active_dir = local_dir
         else:
             active_dir = local_dir
             if not args.no_fetch:
-                fetch_from_pi(host=args.host, dest_dir=local_dir, remote_dir=args.remote_dir)
+                fetch_from_pi(
+                    host=args.host, dest_dir=local_dir, remote_dir=args.remote_dir, delete_source=args.delete_source
+                )
             converted_count = convert_lingering_raw_streams(local_dir)
             if converted_count > 0:
                 print(f"✓ Converted {converted_count} lingering raw stream(s) to MP4.\n")
@@ -445,7 +525,9 @@ def main():
     else:
         active_dir = local_dir
         if not args.no_fetch and not args.list:
-            fetch_from_pi(host=args.host, dest_dir=local_dir, remote_dir=args.remote_dir)
+            fetch_from_pi(
+                host=args.host, dest_dir=local_dir, remote_dir=args.remote_dir, delete_source=args.delete_source
+            )
             convert_lingering_raw_streams(local_dir)
 
     # Search directories for candidate video files

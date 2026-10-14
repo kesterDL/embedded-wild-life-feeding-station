@@ -56,7 +56,7 @@ class TestMaintenance(unittest.TestCase):
         res = set_maintenance_remote("david@pi-3", enable=True)
         self.assertTrue(res)
         mock_run.assert_called_once()
-        self.assertIn("touch", mock_run.call_args[0][0][4])
+        self.assertIn("touch", mock_run.call_args[0][0][-1])
 
     @patch("subprocess.run")
     def test_set_maintenance_remote_disable(self, mock_run):
@@ -64,7 +64,7 @@ class TestMaintenance(unittest.TestCase):
         res = set_maintenance_remote("david@pi-3", enable=False)
         self.assertTrue(res)
         mock_run.assert_called_once()
-        self.assertIn("rm -f", mock_run.call_args[0][0][4])
+        self.assertIn("rm -f", mock_run.call_args[0][0][-1])
 
     @patch("subprocess.run")
     def test_check_maintenance_remote(self, mock_run):
