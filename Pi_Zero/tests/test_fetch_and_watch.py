@@ -9,6 +9,8 @@ from Pi_Zero.scripts.fetch_and_watch import (
     is_mp4_container,
     get_candidate_files,
     package_to_smooth_mp4,
+    sync_recordings,
+    convert_lingering_raw_streams,
 )
 
 
@@ -67,16 +69,35 @@ class TestFetchAndWatch(unittest.TestCase):
             f.write(b"data")
         os.utime(file_new, (2000, 2000))
 
-        # Create temporary file that should be ignored
+        # Create temporary file that should be ignored by default
         file_temp = os.path.join(self.temp_dir, "clip_20261002_120000_temp.h264")
         with open(file_temp, "wb") as f:
             f.write(b"temp")
+
+        # Create AppleDouble file that should be ignored
+        apple_double = os.path.join(self.temp_dir, "._clip_20261002_120000.mp4")
+        with open(apple_double, "wb") as f:
+            f.write(b"metadata")
+
+        # Create 0-byte file that should be ignored
+        empty_file = os.path.join(self.temp_dir, "clip_20261003_000000.mp4")
+        with open(empty_file, "wb") as f:
+            pass
 
         candidates = get_candidate_files([self.temp_dir])
         self.assertEqual(len(candidates), 2)
         # Should be sorted newest first
         self.assertEqual(candidates[0], file_new)
         self.assertEqual(candidates[1], file_old)
+
+    def test_get_candidate_files_with_include_temp(self):
+        file_temp = os.path.join(self.temp_dir, "clip_20261009_185847_temp.h264")
+        with open(file_temp, "wb") as f:
+            f.write(b"raw-stream-content")
+
+        candidates = get_candidate_files([self.temp_dir], include_temp=True)
+        self.assertEqual(len(candidates), 1)
+        self.assertEqual(candidates[0], file_temp)
 
     @patch("shutil.which")
     @patch("subprocess.run")
@@ -98,6 +119,69 @@ class TestFetchAndWatch(unittest.TestCase):
         self.assertIn("-r", cmd)
         self.assertIn("25", cmd)
         self.assertIn(out_file, cmd)
+
+    @patch("Pi_Zero.scripts.fetch_and_watch.package_to_smooth_mp4")
+    def test_sync_recordings_copies_mp4_and_converts_temp_h264(self, mock_package):
+        def _mock_pkg(src, dst, fps):
+            with open(dst, "wb") as f:
+                f.write(b"packaged")
+            return True
+
+        mock_package.side_effect = _mock_pkg
+
+        src_dir = os.path.join(self.temp_dir, "src")
+        dest_dir = os.path.join(self.temp_dir, "dest")
+        os.makedirs(src_dir)
+        os.makedirs(dest_dir)
+
+        # 1. Existing MP4 clip
+        clip_mp4 = os.path.join(src_dir, "clip_20261009_185839.mp4")
+        with open(clip_mp4, "wb") as f:
+            f.write(b"mp4-content")
+
+        # 2. Non-empty temp H.264
+        clip_temp = os.path.join(src_dir, "clip_20261009_185847_temp.h264")
+        with open(clip_temp, "wb") as f:
+            f.write(b"h264-stream")
+
+        # 3. 0-byte aborted temp file (should be skipped)
+        clip_empty = os.path.join(src_dir, "clip_20261009_185905_temp.h264")
+        with open(clip_empty, "wb") as f:
+            pass
+
+        # 4. AppleDouble dot file (should be skipped)
+        dot_file = os.path.join(src_dir, "._clip_20261009_185839.mp4")
+        with open(dot_file, "wb") as f:
+            f.write(b"metadata")
+
+        synced, converted = sync_recordings(src_dir, dest_dir)
+        self.assertEqual(synced, 1)
+        self.assertEqual(converted, 1)
+
+        # Verify MP4 was copied to dest
+        self.assertTrue(os.path.exists(os.path.join(dest_dir, "clip_20261009_185839.mp4")))
+        # Verify temp H.264 was converted to clean MP4 in dest
+        self.assertTrue(os.path.exists(os.path.join(dest_dir, "clip_20261009_185847.mp4")))
+        # Verify 0-byte and dot files were not copied
+        self.assertFalse(os.path.exists(os.path.join(dest_dir, "clip_20261009_185905.mp4")))
+        self.assertFalse(os.path.exists(os.path.join(dest_dir, "._clip_20261009_185839.mp4")))
+
+    @patch("Pi_Zero.scripts.fetch_and_watch.package_to_smooth_mp4")
+    def test_convert_lingering_raw_streams(self, mock_package):
+        def _mock_pkg(src, dst, fps):
+            with open(dst, "wb") as f:
+                f.write(b"packaged")
+            return True
+
+        mock_package.side_effect = _mock_pkg
+
+        raw_stream = os.path.join(self.temp_dir, "camera_test_20261009_172437.h264")
+        with open(raw_stream, "wb") as f:
+            f.write(b"raw-data")
+
+        converted = convert_lingering_raw_streams(self.temp_dir)
+        self.assertEqual(converted, 1)
+        self.assertTrue(os.path.exists(os.path.join(self.temp_dir, "camera_test_20261009_172437.mp4")))
 
 
 if __name__ == "__main__":

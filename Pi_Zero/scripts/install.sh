@@ -22,23 +22,29 @@ PROJECT_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cp -r "${PROJECT_ROOT}/Pi_Zero/." "${INSTALL_DIR}/Pi_Zero/"
 
 
-echo "[2/5] Preparing SD card Wild_Life_Recordings directory..."
-RECORDINGS_DIR=""
-if [ -d "/boot/firmware" ]; then
-  RECORDINGS_DIR="/boot/firmware/Wild_Life_Recordings"
-elif [ -d "/boot" ]; then
-  RECORDINGS_DIR="/boot/Wild_Life_Recordings"
+echo "[2/5] Preparing ext4 Wild_Life_Recordings directory..."
+TARGET_USER="${SUDO_USER:-$(logname 2>/dev/null || echo "$USER")}"
+if [ -n "$TARGET_USER" ] && [ "$TARGET_USER" != "root" ] && [ -d "/home/${TARGET_USER}" ]; then
+  RECORDINGS_DIR="/home/${TARGET_USER}/Wild_Life_Recordings"
+elif id "david" &>/dev/null && [ -d "/home/david" ]; then
+  RECORDINGS_DIR="/home/david/Wild_Life_Recordings"
+elif [ -d "/home/david" ]; then
+  RECORDINGS_DIR="/home/david/Wild_Life_Recordings"
 else
   RECORDINGS_DIR="/var/media/Wild_Life_Recordings"
 fi
 
-mkdir -p "${RECORDINGS_DIR}"
-chmod 777 "${RECORDINGS_DIR}" || true
+# Remove legacy symlink if it previously pointed to bootfs
+if [ -L "${RECORDINGS_DIR}" ]; then
+  rm -f "${RECORDINGS_DIR}"
+fi
 
-# Create symlink for standard user convenience if david exists
+mkdir -p "${RECORDINGS_DIR}"
+chmod 775 "${RECORDINGS_DIR}" || true
 if id "david" &>/dev/null; then
-  ln -sfn "${RECORDINGS_DIR}" /home/david/Wild_Life_Recordings
-  chown -h david:david /home/david/Wild_Life_Recordings 2>/dev/null || true
+  chown -R david:david "${RECORDINGS_DIR}" 2>/dev/null || true
+elif [ -n "$TARGET_USER" ] && [ "$TARGET_USER" != "root" ]; then
+  chown -R "${TARGET_USER}:${TARGET_USER}" "${RECORDINGS_DIR}" 2>/dev/null || true
 fi
 
 echo "[3/5] Ensuring MP4 muxer (ffmpeg or MP4Box) is installed for MP4 encapsulation..."

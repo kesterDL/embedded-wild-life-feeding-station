@@ -16,6 +16,11 @@ class TestMediaOrchestrator(unittest.TestCase):
             camera_service=self.mock_camera,
             watchdog_bridge=self.mock_bridge
         )
+        self.maintenance_patcher = patch.object(self.orchestrator, "is_maintenance_mode", return_value=False)
+        self.maintenance_patcher.start()
+
+    def tearDown(self):
+        self.maintenance_patcher.stop()
 
     def test_full_lifecycle_success(self):
         self.mock_storage.generate_video_path.return_value = "/mnt/usb_storage/videos/clip_1.mp4"

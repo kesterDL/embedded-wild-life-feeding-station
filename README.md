@@ -192,6 +192,9 @@ python3 Pi_Zero/scripts/test_camera_integration.py --dry-run
   # Automatically detects inserted SD card or fetches newest recording over Wi-Fi:
   python3 Pi_Zero/scripts/fetch_and_watch.py
 
+  # Pull & sync all recordings from SD card to local drive and convert raw streams into MP4s:
+  python3 Pi_Zero/scripts/fetch_and_watch.py --pull
+
   # List all available recordings:
   python3 Pi_Zero/scripts/fetch_and_watch.py --list
 

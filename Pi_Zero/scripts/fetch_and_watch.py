@@ -11,6 +11,7 @@ Supports:
 
 Usage:
     python3 Pi_Zero/scripts/fetch_and_watch.py
+    python3 Pi_Zero/scripts/fetch_and_watch.py --pull
     python3 Pi_Zero/scripts/fetch_and_watch.py --list
     python3 Pi_Zero/scripts/fetch_and_watch.py --no-fetch
     python3 Pi_Zero/scripts/fetch_and_watch.py --host user@pi-zero.local
@@ -91,10 +92,11 @@ def is_mp4_container(filepath: str) -> bool:
         return False
 
 
-def get_candidate_files(search_dirs: List[str]) -> List[str]:
+def get_candidate_files(search_dirs: List[str], include_temp: bool = False) -> List[str]:
     """Gathers all valid video files from search directories, newest first."""
     valid_exts = {".mp4", ".h264", ".mov", ".mkv"}
     found_files = []
+    seen_names = set()
 
     for d in search_dirs:
         if not os.path.isdir(d):
@@ -103,10 +105,36 @@ def get_candidate_files(search_dirs: List[str]) -> List[str]:
             if not entry.is_file():
                 continue
             name = entry.name
+            # Skip hidden and macOS AppleDouble files (._*)
+            if name.startswith("."):
+                continue
+            # Avoid duplicate listings if present across multiple search dirs
+            if name in seen_names:
+                continue
+
             ext = os.path.splitext(name)[1].lower()
             if ext in valid_exts:
-                if not name.endswith("_temp.h264") and not name.endswith("_playable.mp4"):
-                    found_files.append(entry.path)
+                if name.endswith("_playable.mp4"):
+                    continue
+                # Skip 0-byte aborted files
+                try:
+                    if entry.stat().st_size == 0:
+                        continue
+                except OSError:
+                    continue
+
+                if name.endswith("_temp.h264"):
+                    if not include_temp:
+                        continue
+                    # Check if converted MP4 already exists in any search directory
+                    clean_base = name[:-10]
+                    if f"{clean_base}.mp4" in seen_names or any(
+                        os.path.exists(os.path.join(sd, f"{clean_base}.mp4")) for sd in search_dirs
+                    ):
+                        continue
+
+                seen_names.add(name)
+                found_files.append(entry.path)
 
     # Sort newest first, prioritizing timestamp in filename (YYYYMMDD_HHMMSS) then mtime
     def sort_key(filepath: str):
@@ -168,6 +196,135 @@ def package_to_smooth_mp4(input_path: str, output_path: str, fps: int = 25) -> b
     return False
 
 
+def sync_recordings(
+    src_dir: str,
+    dest_dir: str,
+    convert_raw: bool = True,
+    fps: int = 25,
+) -> tuple:
+    """Syncs recordings from src_dir to dest_dir and converts non-empty raw H.264 streams.
+
+    Args:
+        src_dir: Source directory containing recordings (e.g., mounted SD card).
+        dest_dir: Local destination directory to copy/convert files into.
+        convert_raw: If True, packages lingering .h264 / _temp.h264 into .mp4.
+        fps: Framerate for packaging H.264 streams into MP4 container.
+
+    Returns:
+        tuple (synced_count, converted_count)
+    """
+    os.makedirs(dest_dir, exist_ok=True)
+    if not os.path.isdir(src_dir):
+        return 0, 0
+
+    synced_count = 0
+    converted_count = 0
+
+    valid_containers = {".mp4", ".mov", ".mkv"}
+
+    try:
+        entries = sorted(os.scandir(src_dir), key=lambda e: e.name)
+    except OSError as e:
+        print(f"[ERROR] Could not scan directory {src_dir}: {e}")
+        return 0, 0
+
+    # 1. Copy containerized files (.mp4, .mov, .mkv)
+    for entry in entries:
+        name = entry.name
+        if not entry.is_file() or name.startswith("."):
+            continue
+        ext = os.path.splitext(name)[1].lower()
+        if ext in valid_containers:
+            dest_path = os.path.join(dest_dir, name)
+            # Only copy if file does not exist or size differs
+            if not os.path.exists(dest_path) or os.path.getsize(dest_path) != entry.stat().st_size:
+                size_mb = entry.stat().st_size / (1024 * 1024)
+                print(f"  Copying: {name} ({size_mb:.2f} MB)...")
+                shutil.copy2(entry.path, dest_path)
+                synced_count += 1
+
+    # 2. Convert non-empty raw streams (.h264, _temp.h264)
+    if convert_raw:
+        for entry in entries:
+            name = entry.name
+            if not entry.is_file() or name.startswith("."):
+                continue
+            ext = os.path.splitext(name)[1].lower()
+            if ext == ".h264":
+                try:
+                    size = entry.stat().st_size
+                except OSError:
+                    continue
+                if size == 0:
+                    continue
+
+                if name.endswith("_temp.h264"):
+                    clean_base = name[:-10]
+                    target_name = f"{clean_base}.mp4"
+                else:
+                    base = os.path.splitext(name)[0]
+                    target_name = f"{base}.mp4"
+
+                dest_mp4 = os.path.join(dest_dir, target_name)
+                # If target mp4 already exists and is non-empty, skip
+                if os.path.exists(dest_mp4) and os.path.getsize(dest_mp4) > 0:
+                    continue
+
+                size_mb = size / (1024 * 1024)
+                print(f"  Packaging raw stream: {name} ({size_mb:.2f} MB) -> {target_name}...")
+                if package_to_smooth_mp4(entry.path, dest_mp4, fps=fps):
+                    print(f"  ✓ Converted to {target_name}")
+                    converted_count += 1
+                else:
+                    print(f"  [WARNING] Failed to convert {name} to MP4")
+
+    return synced_count, converted_count
+
+
+def convert_lingering_raw_streams(directory: str, fps: int = 25) -> int:
+    """Finds non-empty .h264 streams in directory and converts them to MP4 if missing."""
+    if not os.path.isdir(directory):
+        return 0
+
+    converted_count = 0
+    try:
+        entries = sorted(os.scandir(directory), key=lambda e: e.name)
+    except OSError:
+        return 0
+
+    for entry in entries:
+        name = entry.name
+        if not entry.is_file() or name.startswith("."):
+            continue
+        ext = os.path.splitext(name)[1].lower()
+        if ext == ".h264":
+            try:
+                size = entry.stat().st_size
+            except OSError:
+                continue
+            if size == 0:
+                continue
+
+            if name.endswith("_temp.h264"):
+                clean_base = name[:-10]
+                target_name = f"{clean_base}.mp4"
+            else:
+                base = os.path.splitext(name)[0]
+                target_name = f"{base}.mp4"
+
+            dest_mp4 = os.path.join(directory, target_name)
+            if os.path.exists(dest_mp4) and os.path.getsize(dest_mp4) > 0:
+                continue
+
+            size_mb = size / (1024 * 1024)
+            print(f"  Packaging raw stream: {name} ({size_mb:.2f} MB) -> {target_name}...")
+            if package_to_smooth_mp4(entry.path, dest_mp4, fps=fps):
+                print(f"  ✓ Converted to {target_name}")
+                converted_count += 1
+
+    return converted_count
+
+
 def list_recordings(files: List[str]):
     """Prints a formatted summary of available recordings."""
     if not files:
@@ -187,6 +344,12 @@ def list_recordings(files: List[str]):
 def main():
     parser = argparse.ArgumentParser(
         description="Fetch and watch wildlife recordings from Raspberry Pi Zero or mounted SD Card."
+    )
+    parser.add_argument(
+        "--sync", "--pull",
+        dest="sync",
+        action="store_true",
+        help="Pull and sync all recordings from SD card (or remote Pi) to local Wild_Life_Recordings directory, and convert non-empty raw .h264 streams to MP4."
     )
     parser.add_argument(
         "--host",
@@ -216,6 +379,18 @@ def main():
         help="List all recordings found and exit"
     )
     parser.add_argument(
+        "--no-open", "--no-watch",
+        dest="no_open",
+        action="store_true",
+        help="Do not open video in QuickTime Player after fetching/syncing."
+    )
+    parser.add_argument(
+        "--remote-dir",
+        type=str,
+        default=None,
+        help="Optional remote directory path on the Pi (e.g. SquirrelFeeder/Wild_Life_Recordings)"
+    )
+    parser.add_argument(
         "-f", "--file",
         type=str,
         default=None,
@@ -230,22 +405,32 @@ def main():
 
     active_dir = None
 
-    # Determine whether reading from SD card or fetching via SCP
-    should_fetch = not args.no_fetch and not args.list
-    if args.force_fetch:
-        should_fetch = True
-
     if args.dir:
         active_dir = local_dir
+    elif args.sync:
+        if sd_card_dir and not args.force_fetch:
+            print(f"✓ Found Raspberry Pi SD Card mounted at: {sd_card_dir}")
+            print(f"Syncing recordings from SD card to local directory ({local_dir})...")
+            synced_count, converted_count = sync_recordings(sd_card_dir, local_dir)
+            print(f"✓ Sync complete: {synced_count} file(s) copied, {converted_count} raw stream(s) converted to MP4.\n")
+            active_dir = local_dir
+        else:
+            active_dir = local_dir
+            if not args.no_fetch:
+                fetch_from_pi(host=args.host, dest_dir=local_dir, remote_dir=args.remote_dir)
+            converted_count = convert_lingering_raw_streams(local_dir)
+            if converted_count > 0:
+                print(f"✓ Converted {converted_count} lingering raw stream(s) to MP4.\n")
     elif sd_card_dir and not args.force_fetch:
         print(f"✓ Found Raspberry Pi SD Card mounted at: {sd_card_dir}")
         print("Reading recordings directly from SD Card without network overhead!")
+        print("Tip: Run with --pull (or --sync) to copy all SD card clips locally and convert raw streams.\n")
         active_dir = sd_card_dir
     else:
         active_dir = local_dir
-        if should_fetch:
-            fetch_from_pi(host=args.host, dest_dir=local_dir)
-
+        if not args.no_fetch and not args.list:
+            fetch_from_pi(host=args.host, dest_dir=local_dir, remote_dir=args.remote_dir)
+            convert_lingering_raw_streams(local_dir)
 
     # Search directories for candidate video files
     search_dirs = [active_dir]
@@ -255,7 +440,7 @@ def main():
     if os.path.isdir(REPO_ROOT):
         search_dirs.append(REPO_ROOT)
 
-    candidates = get_candidate_files(search_dirs)
+    candidates = get_candidate_files(search_dirs, include_temp=True)
 
     if args.list:
         list_recordings(candidates)
@@ -277,26 +462,33 @@ def main():
         target_video = candidates[0]
 
     size_mb = os.path.getsize(target_video) / (1024 * 1024)
-    print(f"\nTarget recording: {target_video} ({size_mb:.2f} MB)")
+    print(f"Target recording: {target_video} ({size_mb:.2f} MB)")
 
     if is_mp4_container(target_video):
-        print("File is a valid MP4 container. Launching in QuickTime Player...")
-        subprocess.run(["open", target_video])
-        print("✓ Opened in QuickTime Player!")
+        if not args.no_open:
+            print("File is a valid MP4 container. Launching in QuickTime Player...")
+            subprocess.run(["open", target_video])
+            print("✓ Opened in QuickTime Player!")
+        else:
+            print(f"File is a valid MP4 container: {target_video}")
     else:
         print("Raw H.264 stream detected. Packaging into QuickTime-compatible MP4 container...")
         base_name = os.path.splitext(os.path.basename(target_video))[0]
-        # Place the smooth MP4 in local_dir so we don't write to read-only or slow SD card unnecessarily
-        output_mp4 = os.path.join(local_dir, f"{base_name}_smooth.mp4")
+        clean_name = base_name[:-5] if base_name.endswith("_temp") else base_name
+        output_mp4 = os.path.join(local_dir, f"{clean_name}.mp4")
+        if os.path.exists(output_mp4) and os.path.getsize(output_mp4) > 0 and output_mp4 != target_video:
+            output_mp4 = os.path.join(local_dir, f"{clean_name}_smooth.mp4")
 
         success = package_to_smooth_mp4(target_video, output_mp4, fps=25)
         if success:
             print(f"✓ Smooth MP4 created: {output_mp4}")
-            subprocess.run(["open", output_mp4])
-            print("✓ Opened in QuickTime Player!")
+            if not args.no_open:
+                subprocess.run(["open", output_mp4])
+                print("✓ Opened in QuickTime Player!")
         else:
             print("[WARNING] Could not package to MP4. Attempting to launch in VLC...")
-            subprocess.run(["open", "-a", "VLC", target_video])
+            if not args.no_open:
+                subprocess.run(["open", "-a", "VLC", target_video])
 
 
 if __name__ == "__main__":
