@@ -26,7 +26,7 @@ import subprocess
 import sys
 from typing import List, Optional
 
-HOST = "david@pi-zero.local"
+HOST = "david@pi-3"
 VLC_PATH = "/Applications/VLC.app/Contents/MacOS/VLC"
 RECORDINGS_DIR_NAME = "Wild_Life_Recordings"
 
