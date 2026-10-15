@@ -88,6 +88,41 @@ class TestMediaOrchestrator(unittest.TestCase):
         self.assertIn("CAMERA_ERROR", content)
         self.assertIn("clip_err.mp4", content)
 
+    def test_maintenance_mode_skips_shutdown_ack_and_halt(self):
+        self.mock_storage.generate_video_path.return_value = "/mnt/usb_storage/videos/clip_maint.mp4"
+        self.maintenance_patcher.stop()
+        with patch.object(self.orchestrator, "is_maintenance_mode", return_value=True), \
+             patch.object(self.orchestrator, "halt_system") as mock_halt:
+            result = self.orchestrator.run_cycle(dry_run=False)
+            self.assertTrue(result)
+            self.mock_storage.unmount.assert_called_once()
+            # Arduino Nano ACK and OS halt MUST NOT be called in maintenance mode
+            self.mock_bridge.signal_shutdown_ack.assert_not_called()
+            mock_halt.assert_not_called()
+        self.maintenance_patcher.start()
+
+    def test_dry_run_skips_shutdown_ack_and_halt(self):
+        self.mock_storage.generate_video_path.return_value = "/mnt/usb_storage/videos/clip_dry.mp4"
+        with patch.object(self.orchestrator, "halt_system") as mock_halt:
+            result = self.orchestrator.run_cycle(dry_run=True)
+            self.assertTrue(result)
+            self.mock_storage.unmount.assert_called_once()
+            # Arduino Nano ACK and OS halt MUST NOT be called in dry-run mode
+            self.mock_bridge.signal_shutdown_ack.assert_not_called()
+            mock_halt.assert_not_called()
+
+    def test_storage_error_in_maintenance_mode_skips_shutdown_ack_and_halt(self):
+        self.mock_storage.mount.side_effect = StorageNotFoundError("No USB device")
+        self.maintenance_patcher.stop()
+        with patch.object(self.orchestrator, "is_maintenance_mode", return_value=True), \
+             patch.object(self.orchestrator, "halt_system") as mock_halt:
+            result = self.orchestrator.run_cycle(dry_run=False)
+            self.assertFalse(result)
+            self.mock_bridge.signal_shutdown_ack.assert_not_called()
+            mock_halt.assert_not_called()
+        self.maintenance_patcher.start()
+
 
 if __name__ == "__main__":
     unittest.main()
+

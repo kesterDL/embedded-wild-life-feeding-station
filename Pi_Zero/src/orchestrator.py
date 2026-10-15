@@ -187,9 +187,11 @@ class MediaOrchestrator:
                 video_file="none",
                 throttled=get_throttled_state()
             )
-            self.watchdog_bridge.signal_shutdown_ack()
             if not dry_run and not self.is_maintenance_mode():
+                self.watchdog_bridge.signal_shutdown_ack()
                 self.halt_system()
+            else:
+                logger.info("Maintenance mode or dry-run active. Skipping watchdog shutdown ACK and system poweroff.")
             return False
 
         # 2. Record Video
@@ -229,14 +231,12 @@ class MediaOrchestrator:
             logger.info("Flushing disk caches and unmounting storage...")
             self.storage_manager.unmount()
 
-            # 4. Signal Shutdown ACK to Arduino Nano
-            logger.info("Signaling shutdown ACK to Arduino Nano watchdog...")
-            self.watchdog_bridge.signal_shutdown_ack()
-
-            # 5. Halt System
+            # 4. Signal Shutdown ACK to Arduino Nano & Halt System
             if dry_run or self.is_maintenance_mode():
-                logger.info("Maintenance mode or dry-run active. Skipping system poweroff.")
+                logger.info("Maintenance mode or dry-run active. Skipping watchdog shutdown ACK and system poweroff.")
             else:
+                logger.info("Signaling shutdown ACK to Arduino Nano watchdog...")
+                self.watchdog_bridge.signal_shutdown_ack()
                 self.halt_system()
 
         return success
