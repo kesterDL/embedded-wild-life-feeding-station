@@ -93,6 +93,44 @@ class TestMaintenance(unittest.TestCase):
             code = main()
             self.assertEqual(code, 0)
 
+    def test_hardware_toggling_in_config_txt(self):
+        config_path = os.path.join(self.boot_dir, "config.txt")
+        with open(config_path, "w") as f:
+            f.write("dtoverlay=disable-bt\n")
+
+        # Field mode: should disable Wi-Fi and HDMI
+        set_maintenance_local(self.boot_dir, enable=False, toggle_hardware=True)
+        with open(config_path, "r") as f:
+            content = f.read()
+        self.assertIn("dtoverlay=disable-wifi", content)
+        self.assertIn("hdmi_blanking=2", content)
+
+        # Bench mode: should comment out disable-wifi and hdmi_blanking
+        set_maintenance_local(self.boot_dir, enable=True, toggle_hardware=True)
+        with open(config_path, "r") as f:
+            content = f.read()
+        self.assertIn("# dtoverlay=disable-wifi", content)
+        self.assertIn("# hdmi_blanking=2", content)
+
+    @patch("Pi_Zero.scripts.maintenance.find_local_boot_partitions")
+    def test_main_bench_and_field_actions(self, mock_find):
+        mock_find.return_value = [self.boot_dir]
+        config_path = os.path.join(self.boot_dir, "config.txt")
+        with open(config_path, "w") as f:
+            f.write("dtoverlay=disable-bt\n")
+
+        # Run field
+        with patch("sys.argv", ["maintenance.py", "field"]):
+            code = main()
+            self.assertEqual(code, 0)
+            self.assertFalse(get_maintenance_status_local(self.boot_dir))
+
+        # Run bench
+        with patch("sys.argv", ["maintenance.py", "bench"]):
+            code = main()
+            self.assertEqual(code, 0)
+            self.assertTrue(get_maintenance_status_local(self.boot_dir))
+
 
 if __name__ == "__main__":
     unittest.main()
