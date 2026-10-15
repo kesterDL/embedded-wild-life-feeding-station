@@ -11,6 +11,7 @@ from Pi_Zero.scripts.fetch_and_watch import (
     package_to_smooth_mp4,
     sync_recordings,
     convert_lingering_raw_streams,
+    fetch_from_pi,
 )
 
 
@@ -154,6 +155,11 @@ class TestFetchAndWatch(unittest.TestCase):
         with open(dot_file, "wb") as f:
             f.write(b"metadata")
 
+        # 5. Lifecycle metrics log
+        log_file = os.path.join(src_dir, "lifecycle.log")
+        with open(log_file, "w") as f:
+            f.write("timestamp,uptime_s,record_s,mux_s,total_cycle_s,status,video_file,throttled\n")
+
         synced, converted = sync_recordings(src_dir, dest_dir)
         self.assertEqual(synced, 1)
         self.assertEqual(converted, 1)
@@ -162,6 +168,8 @@ class TestFetchAndWatch(unittest.TestCase):
         self.assertTrue(os.path.exists(os.path.join(dest_dir, "clip_20261009_185839.mp4")))
         # Verify temp H.264 was converted to clean MP4 in dest
         self.assertTrue(os.path.exists(os.path.join(dest_dir, "clip_20261009_185847.mp4")))
+        # Verify lifecycle.log was copied to dest
+        self.assertTrue(os.path.exists(os.path.join(dest_dir, "lifecycle.log")))
         # Verify 0-byte and dot files were not copied
         self.assertFalse(os.path.exists(os.path.join(dest_dir, "clip_20261009_185905.mp4")))
         self.assertFalse(os.path.exists(os.path.join(dest_dir, "._clip_20261009_185839.mp4")))
@@ -182,6 +190,58 @@ class TestFetchAndWatch(unittest.TestCase):
         converted = convert_lingering_raw_streams(self.temp_dir)
         self.assertEqual(converted, 1)
         self.assertTrue(os.path.exists(os.path.join(self.temp_dir, "camera_test_20261009_172437.mp4")))
+
+    @patch("Pi_Zero.scripts.fetch_and_watch.package_to_smooth_mp4")
+    def test_sync_recordings_delete_source(self, mock_package):
+        mock_package.return_value = True
+
+        src_dir = os.path.join(self.temp_dir, "src_del")
+        dest_dir = os.path.join(self.temp_dir, "dest_del")
+        os.makedirs(src_dir)
+        os.makedirs(dest_dir)
+
+        clip_mp4 = os.path.join(src_dir, "clip_test.mp4")
+        with open(clip_mp4, "wb") as f:
+            f.write(b"mp4-content")
+
+        log_file = os.path.join(src_dir, "lifecycle.log")
+        with open(log_file, "w") as f:
+            f.write("log-data\n")
+
+        # 1. Test with delete_source=True (default)
+        sync_recordings(src_dir, dest_dir, delete_source=True)
+        # MP4 should be copied to dest and deleted from src
+        self.assertTrue(os.path.exists(os.path.join(dest_dir, "clip_test.mp4")))
+        self.assertFalse(os.path.exists(clip_mp4))
+        # Log should be copied to dest but retained in src
+        self.assertTrue(os.path.exists(os.path.join(dest_dir, "lifecycle.log")))
+        self.assertTrue(os.path.exists(log_file))
+
+    @patch("shutil.which")
+    @patch("subprocess.run")
+    def test_fetch_from_pi_rsync_delete_source(self, mock_run, mock_which):
+        mock_which.return_value = "/usr/bin/rsync"
+        mock_run.return_value = MagicMock(returncode=0)
+
+        dest_dir = os.path.join(self.temp_dir, "dest_remote")
+
+        # 1. Default delete_source=True
+        fetch_from_pi(host="david@pi-3", dest_dir=dest_dir, delete_source=True)
+        # Should have run rsync with --remove-source-files, and then ssh rm
+        self.assertEqual(mock_run.call_count, 2)
+        rsync_cmd = mock_run.call_args_list[0][0][0]
+        self.assertIn("--remove-source-files", rsync_cmd)
+        ssh_cmd = mock_run.call_args_list[1][0][0]
+        self.assertEqual(ssh_cmd[0], "ssh")
+        self.assertIn("rm -f", ssh_cmd[4])
+
+        mock_run.reset_mock()
+
+        # 2. delete_source=False
+        fetch_from_pi(host="david@pi-3", dest_dir=dest_dir, delete_source=False)
+        self.assertEqual(mock_run.call_count, 1)
+        rsync_cmd = mock_run.call_args_list[0][0][0]
+        self.assertNotIn("--remove-source-files", rsync_cmd)
 
 
 if __name__ == "__main__":

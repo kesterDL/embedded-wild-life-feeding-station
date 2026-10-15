@@ -58,7 +58,15 @@ cp "${SERVICE_SRC}" "${SERVICE_DEST}"
 chmod 644 "${SERVICE_DEST}"
 
 echo "[5/5] Enabling service..."
+# Remove temporary boot mask from cmdline.txt if present
+for CMDLINE in /boot/firmware/cmdline.txt /boot/cmdline.txt; do
+  if [ -f "$CMDLINE" ]; then
+    sed -i 's/ systemd.mask=squirrel-record.service//' "$CMDLINE"
+  fi
+done
+
 systemctl daemon-reload
+systemctl unmask squirrel-record.service 2>/dev/null || true
 systemctl enable squirrel-record.service
 
 echo "=== SquirrelFeeder service installed successfully! ==="

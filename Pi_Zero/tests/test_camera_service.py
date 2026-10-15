@@ -19,6 +19,8 @@ class TestCameraService(unittest.TestCase):
         self.assertEqual(default_cam.width, 1920)
         self.assertEqual(default_cam.height, 1080)
         self.assertEqual(default_cam.duration_ms, 20000)
+        self.assertEqual(default_cam.last_record_duration, 0.0)
+        self.assertEqual(default_cam.last_mux_duration, 0.0)
 
     @patch("shutil.which")
     def test_resolve_binary_preference(self, mock_which):
@@ -69,6 +71,8 @@ class TestCameraService(unittest.TestCase):
         result = self.camera.record_video("/mnt/usb_storage/videos/clip_test.mp4")
         self.assertTrue(result)
         self.assertEqual(mock_run.call_count, 2)
+        self.assertGreaterEqual(self.camera.last_record_duration, 0.0)
+        self.assertGreaterEqual(self.camera.last_mux_duration, 0.0)
 
     @patch("shutil.which")
     @patch("subprocess.run")
