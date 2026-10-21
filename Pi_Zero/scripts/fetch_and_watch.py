@@ -57,16 +57,39 @@ def find_mounted_sd_card_dir() -> Optional[str]:
 import re
 
 
+def parse_diagnostic_filename(filename: str) -> dict:
+    """Parses sequence and diagnostic metadata from a video filename.
+
+    Matches: clip_{SEQ:05d}_boot{UPTIME}s_{PWR}.mp4 (or .h264)
+    Returns dict with 'seq', 'boot', 'power', or 'N/A' if non-matching/legacy.
+    """
+    base = os.path.basename(filename)
+    match = re.search(r"clip_(\d+)_boot(\d+)s_([a-zA-Z0-9]+)", base)
+    if match:
+        return {
+            "seq": match.group(1),
+            "boot": f"{match.group(2)}s",
+            "power": match.group(3),
+        }
+    return {
+        "seq": "N/A",
+        "boot": "N/A",
+        "power": "N/A",
+    }
+
+
 def fetch_from_pi(
     host: str,
     dest_dir: str,
     remote_dir: Optional[str] = None,
     delete_source: bool = True,
+    sync_log: bool = False,
 ):
     """Downloads recordings from the remote Raspberry Pi via rsync or scp.
 
     If delete_source is True, removes confirmed transferred recordings from the remote
     Wild_Life_Recordings directory after a successful sync.
+    If sync_log is True, also syncs lifecycle.log from the Pi boot partition.
     """
     os.makedirs(dest_dir, exist_ok=True)
     rsync_bin = shutil.which("rsync")
@@ -93,6 +116,19 @@ def fetch_from_pi(
                     ]
                     subprocess.run(cleanup_cmd, check=False)
                     print(f"✓ Cleaned up confirmed recordings from {host}:~/{candidate}/.")
+
+                if sync_log:
+                    log_dest = os.path.join(dest_dir, "lifecycle.log")
+                    for remote_log in ["/boot/firmware/lifecycle.log", "/boot/lifecycle.log"]:
+                        subprocess.run(
+                            ["scp", "-p", f"{host}:{remote_log}", log_dest],
+                            stdout=subprocess.DEVNULL,
+                            stderr=subprocess.DEVNULL,
+                            check=False
+                        )
+                        if os.path.exists(log_dest):
+                            print(f"✓ Synced lifecycle metrics log to {log_dest}")
+                            break
                 return
 
         # Fallback to scp command preserving timestamps
@@ -110,6 +146,19 @@ def fetch_from_pi(
                 ]
                 subprocess.run(cleanup_cmd, check=False)
                 print(f"✓ Cleaned up confirmed recordings from {host}:~/{candidate}/.")
+
+            if sync_log:
+                log_dest = os.path.join(dest_dir, "lifecycle.log")
+                for remote_log in ["/boot/firmware/lifecycle.log", "/boot/lifecycle.log"]:
+                    subprocess.run(
+                        ["scp", "-p", f"{host}:{remote_log}", log_dest],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                        check=False
+                    )
+                    if os.path.exists(log_dest):
+                        print(f"✓ Synced lifecycle metrics log to {log_dest}")
+                        break
             return
 
     print("Note: Finished attempting to fetch recordings.")
@@ -169,11 +218,23 @@ def get_candidate_files(search_dirs: List[str], include_temp: bool = False) -> L
                 seen_names.add(name)
                 found_files.append(entry.path)
 
-    # Sort newest first, prioritizing timestamp in filename (YYYYMMDD_HHMMSS) then mtime
+    # Sort newest first, prioritizing monotonic sequence (clip_00042) then timestamp then mtime
     def sort_key(filepath: str):
-        match = re.search(r"(\d{8}_\d{6})", os.path.basename(filepath))
-        timestamp_str = match.group(1) if match else ""
-        return (timestamp_str, os.path.getmtime(filepath))
+        basename = os.path.basename(filepath)
+        # 1. Monotonic sequence: clip_(\d+)
+        seq_match = re.search(r"clip_(\d+)_", basename)
+        seq_val = 0
+        if seq_match:
+            try:
+                seq_val = int(seq_match.group(1))
+            except ValueError:
+                pass
+
+        # 2. Legacy timestamp: (\d{8}_\d{6})
+        ts_match = re.search(r"(\d{8}_\d{6})", basename)
+        timestamp_str = ts_match.group(1) if ts_match else ""
+
+        return (seq_val, timestamp_str, os.path.getmtime(filepath))
 
     found_files.sort(key=sort_key, reverse=True)
     return found_files
@@ -416,14 +477,21 @@ def list_recordings(files: List[str]):
         print("No recordings found.")
         return
 
-    print("\n" + "=" * 70)
-    print(f"  {'FILENAME':<42} {'SIZE (MB)':<12} {'MODIFIED'}")
-    print("=" * 70)
+    print("\n" + "=" * 92)
+    print(f"  {'SEQ':<7} {'FILENAME':<38} {'BOOT':<7} {'POWER':<9} {'SIZE (MB)':<11} {'MODIFIED'}")
+    print("=" * 92)
     for f in files:
         size_mb = os.path.getsize(f) / (1024 * 1024)
         mtime = datetime.datetime.fromtimestamp(os.path.getmtime(f)).strftime("%Y-%m-%d %H:%M:%S")
-        print(f"  {os.path.basename(f):<42} {size_mb:>8.2f} MB   {mtime}")
-    print("=" * 70 + "\n")
+        diag = parse_diagnostic_filename(f)
+        seq_str = diag["seq"]
+        boot_str = diag["boot"]
+        pwr_str = diag["power"]
+        fname = os.path.basename(f)
+        if len(fname) > 37:
+            fname = fname[:34] + "..."
+        print(f"  {seq_str:<7} {fname:<38} {boot_str:<7} {pwr_str:<9} {size_mb:>8.2f} MB   {mtime}")
+    print("=" * 92 + "\n")
 
 
 def main():
@@ -512,7 +580,7 @@ def main():
             active_dir = local_dir
             if not args.no_fetch:
                 fetch_from_pi(
-                    host=args.host, dest_dir=local_dir, remote_dir=args.remote_dir, delete_source=args.delete_source
+                    host=args.host, dest_dir=local_dir, remote_dir=args.remote_dir, delete_source=args.delete_source, sync_log=True
                 )
             converted_count = convert_lingering_raw_streams(local_dir)
             if converted_count > 0:
@@ -526,7 +594,7 @@ def main():
         active_dir = local_dir
         if not args.no_fetch and not args.list:
             fetch_from_pi(
-                host=args.host, dest_dir=local_dir, remote_dir=args.remote_dir, delete_source=args.delete_source
+                host=args.host, dest_dir=local_dir, remote_dir=args.remote_dir, delete_source=args.delete_source, sync_log=True
             )
             convert_lingering_raw_streams(local_dir)
 

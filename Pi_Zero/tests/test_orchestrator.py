@@ -32,13 +32,18 @@ class TestMediaOrchestrator(unittest.TestCase):
         self.maintenance_patcher.stop()
         self.temp_dir.cleanup()
 
-    def test_full_lifecycle_success(self):
-        self.mock_storage.generate_video_path.return_value = "/mnt/usb_storage/videos/clip_1.mp4"
+    @patch("Pi_Zero.src.orchestrator.get_throttled_state", return_value="throttled=0x0")
+    @patch("Pi_Zero.src.orchestrator.get_system_uptime", return_value=16.48)
+    def test_full_lifecycle_success(self, mock_uptime, mock_throttled):
+        self.mock_storage.generate_video_path.return_value = "/mnt/usb_storage/videos/clip_00001_boot16s_pwrOK.mp4"
         with patch.object(self.orchestrator, "halt_system") as mock_halt:
             result = self.orchestrator.run_cycle(dry_run=False)
             self.assertTrue(result)
             self.mock_storage.mount.assert_called_once()
-            self.mock_camera.record_video.assert_called_with("/mnt/usb_storage/videos/clip_1.mp4")
+            self.mock_storage.generate_video_path.assert_called_once_with(
+                uptime_s=16.48, throttled_state="throttled=0x0"
+            )
+            self.mock_camera.record_video.assert_called_with("/mnt/usb_storage/videos/clip_00001_boot16s_pwrOK.mp4")
             self.mock_storage.unmount.assert_called_once()
             self.mock_bridge.signal_shutdown_ack.assert_called_once()
             mock_halt.assert_called_once()
@@ -49,7 +54,7 @@ class TestMediaOrchestrator(unittest.TestCase):
         self.assertEqual(len(lines), 2)
         self.assertIn("timestamp,uptime_s,record_s,mux_s,total_cycle_s,status,video_file,throttled", lines[0])
         self.assertIn("SUCCESS", lines[1])
-        self.assertIn("clip_1.mp4", lines[1])
+        self.assertIn("clip_00001_boot16s_pwrOK.mp4", lines[1])
         self.assertIn("20.00", lines[1])
         self.assertIn("5.20", lines[1])
 

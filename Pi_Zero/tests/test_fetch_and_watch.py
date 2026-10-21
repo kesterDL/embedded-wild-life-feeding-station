@@ -12,6 +12,7 @@ from Pi_Zero.scripts.fetch_and_watch import (
     sync_recordings,
     convert_lingering_raw_streams,
     fetch_from_pi,
+    parse_diagnostic_filename,
 )
 
 
@@ -91,8 +92,24 @@ class TestFetchAndWatch(unittest.TestCase):
         self.assertEqual(candidates[0], file_new)
         self.assertEqual(candidates[1], file_old)
 
+    def test_get_candidate_files_sequence_sorting(self):
+        # Create clips with sequential diagnostic names
+        f1 = os.path.join(self.temp_dir, "clip_00001_boot15s_pwrOK.mp4")
+        f2 = os.path.join(self.temp_dir, "clip_00002_boot16s_pwrOK.mp4")
+        f3 = os.path.join(self.temp_dir, "clip_00003_boot17s_pwrWARN.mp4")
+        for f in (f1, f2, f3):
+            with open(f, "wb") as fp:
+                fp.write(b"video")
+
+        candidates = get_candidate_files([self.temp_dir])
+        self.assertEqual(len(candidates), 3)
+        # Monotonic sequence should be sorted descending (newest clip first)
+        self.assertEqual(candidates[0], f3)
+        self.assertEqual(candidates[1], f2)
+        self.assertEqual(candidates[2], f1)
+
     def test_get_candidate_files_with_include_temp(self):
-        file_temp = os.path.join(self.temp_dir, "clip_20261009_185847_temp.h264")
+        file_temp = os.path.join(self.temp_dir, "clip_00005_boot16s_pwrOK_temp.h264")
         with open(file_temp, "wb") as f:
             f.write(b"raw-stream-content")
 
@@ -242,6 +259,23 @@ class TestFetchAndWatch(unittest.TestCase):
         self.assertEqual(mock_run.call_count, 1)
         rsync_cmd = mock_run.call_args_list[0][0][0]
         self.assertNotIn("--remove-source-files", rsync_cmd)
+
+    def test_parse_diagnostic_filename(self):
+        diag = parse_diagnostic_filename("clip_00042_boot16s_pwrOK.mp4")
+        self.assertEqual(diag["seq"], "00042")
+        self.assertEqual(diag["boot"], "16s")
+        self.assertEqual(diag["power"], "pwrOK")
+
+        diag_warn = parse_diagnostic_filename("clip_00099_boot18s_pwrWARN.mp4")
+        self.assertEqual(diag_warn["seq"], "00099")
+        self.assertEqual(diag_warn["boot"], "18s")
+        self.assertEqual(diag_warn["power"], "pwrWARN")
+
+        # Legacy or non-diagnostic filenames
+        diag_legacy = parse_diagnostic_filename("clip_20261015_194026.mp4")
+        self.assertEqual(diag_legacy["seq"], "N/A")
+        self.assertEqual(diag_legacy["boot"], "N/A")
+        self.assertEqual(diag_legacy["power"], "N/A")
 
 
 if __name__ == "__main__":
