@@ -329,12 +329,20 @@ WantedBy=basic.target
 Standard Raspberry Pi OS Lite boots in **35 to 50 seconds** and consumes ~150–220 mA idle.  
 Our field target is **< 15 seconds cold-boot** and minimal energy consumption.
 
-### 4.1 Automated Optimization via `optimize_os.sh`
+### 4.1 Automated Optimization (`optimize_os.sh` & `optimize_pi3.sh`)
 
-Run the optimization script ([`/Pi_Zero/scripts/optimize_os.sh`](/Pi_Zero/scripts/optimize_os.sh)) with root privileges on the Pi:
+The optimization script auto-detects whether the board is a **Raspberry Pi Zero / Zero W** or a **Raspberry Pi 3 (3B / 3B+)**, or accepts explicit profile flags:
 
 ```bash
+# Auto-detect connected board model (Zero or Pi 3B):
 sudo ./Pi_Zero/scripts/optimize_os.sh
+
+# Or target specifically for Raspberry Pi 3 (3B / 3B+):
+sudo ./Pi_Zero/scripts/optimize_pi3.sh
+# (or sudo ./Pi_Zero/scripts/optimize_os.sh --pi3)
+
+# Or target specifically for Raspberry Pi Zero / Zero W:
+sudo ./Pi_Zero/scripts/optimize_os.sh --zero
 ```
 
 ---
@@ -429,36 +437,52 @@ On older VideoCore firmware releases, shut down the HDMI video generator:
 
 ---
 
-## 5. Developer Maintenance Mode (Preventing Auto-Shutdown)
+## 5. Maintenance Mode vs. Field Deployment Profiles
 
-Because `orchestrator.py` initiates a system `poweroff` after recording, working interactively over SSH could trigger a shutdown unless **Maintenance Mode** is active.
+Because `orchestrator.py` initiates a system `poweroff` after recording, working interactively over SSH or connecting a display requires **Bench / Developer Mode**. When ready for battery operation, switch to **Autonomous Field Mode**.
 
-### How Maintenance Mode Works
-Before shutting down, [`/Pi_Zero/src/orchestrator.py`](/Pi_Zero/src/orchestrator.py) checks for the existence of a flag file named `maintenance` or `no_shutdown`. If found, it skips `poweroff` entirely.
+Use [`maintenance.sh`](/Pi_Zero/scripts/maintenance.sh) to switch profiles seamlessly:
 
-### Activating Maintenance Mode:
+### 5.1 Switching Profiles
 
-#### Method A: From a Development Machine via SD Card Reader
-1. Plug the microSD card into your development computer.
-2. The boot partition will mount as `/Volumes/bootfs` or `/Volumes/boot` (macOS/Linux).
-3. Create an empty file in the root of the volume:
+#### Bench / Developer Mode (Pi Stays Awake, Wi-Fi & HDMI ON)
+When the microSD card is inserted into your Mac (or in an active SSH session):
+```bash
+./Pi_Zero/scripts/maintenance.sh bench
+# (aliases: ./maintenance.sh on, ./maintenance.sh dev)
+```
+* **Auto-Shutdown:** DISABLED (`maintenance` and `no_shutdown` flags created).
+* **Wi-Fi:** ENABLED (`dtoverlay=disable-wifi` commented out in `config.txt`).
+* **HDMI:** ENABLED (`hdmi_blanking=2` commented out in `config.txt`).
+
+#### Field Deployment Mode (Auto-Shutdown ON, Wi-Fi & HDMI OFF)
+When ready to install the feeder in the yard:
+```bash
+./Pi_Zero/scripts/maintenance.sh field
+# (aliases: ./maintenance.sh off, ./maintenance.sh deploy)
+```
+* **Auto-Shutdown:** ENABLED (flags removed; Pi halts cleanly after 20s recording).
+* **Wi-Fi:** DISABLED (`dtoverlay=disable-wifi` added to save ~30–50 mA).
+* **HDMI:** DISABLED (`hdmi_blanking=2` added to save ~25–30 mA).
+* *(Optional)* If you want auto-shutdown enabled but wish to keep Wi-Fi active for testing, add `--keep-wifi`:
+  ```bash
+  ./Pi_Zero/scripts/maintenance.sh field --keep-wifi
+  ```
+
+### 5.2 Accessing the Pi When Wi-Fi is Disabled
+
+If Wi-Fi and HDMI are turned off in field mode, you have three ways to access the Pi again:
+
+1. **Direct MicroSD on Mac (Recommended):**
+   Power down the Pi, plug the microSD card into your Mac, and run:
    ```bash
-   touch /Volumes/bootfs/maintenance
+   ./Pi_Zero/scripts/maintenance.sh bench
    ```
-4. Eject the SD card and boot the Pi. The Pi will stay powered on indefinitely.
-
-#### Method B: In an Active SSH Session
-```bash
-touch /boot/firmware/maintenance
-# or
-touch ~/Wild_Life_Recordings/maintenance
-```
-
-### Deactivating Maintenance Mode (Field Readiness):
-When you are ready to deploy the feeder into the field:
-```bash
-sudo rm -f /boot/firmware/maintenance /boot/firmware/no_shutdown ~/Wild_Life_Recordings/maintenance
-```
+   This modifies `/Volumes/bootfs/config.txt` and re-enables Wi-Fi and HDMI with zero network required.
+2. **Wired Ethernet (Raspberry Pi 3):**
+   Connect an Ethernet cable from the Pi 3 to your router or laptop. SSH over Ethernet (`ssh david@pi-3.local`) works even when Wi-Fi is disabled.
+3. **Serial Console:**
+   Connect a 3.3V USB-to-UART bridge to GPIO 14 (TX) / GPIO 15 (RX).
 
 ---
 
@@ -528,3 +552,23 @@ python3 Pi_Zero/scripts/fetch_and_watch.py
 # Or fetch from a custom remote folder
 python3 Pi_Zero/scripts/fetch_and_watch.py --remote-dir SquirrelFeeder/Wild_Life_Recordings
 ```
+
+---
+
+### 6.6 Visualizing Performance, Brownout & Lifecycle Metrics
+
+The system includes an offline-first, interactive HTML metrics dashboard for tracking start-up latency, supply rail brownouts (`vcgencmd get_throttled`), cycle timing breakdowns, reliability rates, and file payloads.
+
+For full architectural details, see [Diagnostics, Telemetry & Visualization Architecture](file:///Users/davidkester/Workspace/SquirrelFeeder/Design_Docs/Diagnostics_and_Metrics.md).
+
+```bash
+# Generate and open dashboard in your default browser:
+python3 Pi_Zero/scripts/visualize_metrics.py --open
+
+# Or pull recordings and launch dashboard in one command:
+python3 Pi_Zero/scripts/fetch_and_watch.py --pull --visualize
+
+# View dashboard from existing local recordings without pulling:
+python3 Pi_Zero/scripts/fetch_and_watch.py --visualize
+```
+

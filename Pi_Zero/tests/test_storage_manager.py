@@ -75,11 +75,59 @@ class TestStorageManager(unittest.TestCase):
         self.assertIn("/mnt/usb_storage", cmd)
 
     @patch("os.makedirs")
-    def test_generate_video_path_format(self, mock_makedirs):
-        path = self.sm.generate_video_path(timestamp="20260910_123000")
-        expected_path = "/mnt/usb_storage/Wild_Life_Recordings/clip_20260910_123000.mp4"
+    def test_generate_video_path_diagnostic_format_ok(self, mock_makedirs):
+        # Format: clip_{SEQ:05d}_boot{UPTIME}s_{PWR}.mp4
+        path = self.sm.generate_video_path(uptime_s=16.48, throttled_state="throttled=0x0", seq=42)
+        expected_path = "/mnt/usb_storage/Wild_Life_Recordings/clip_00042_boot16s_pwrOK.mp4"
         self.assertEqual(path, expected_path)
         mock_makedirs.assert_called_with("/mnt/usb_storage/Wild_Life_Recordings", exist_ok=True)
+
+    @patch("os.makedirs")
+    def test_generate_video_path_diagnostic_format_warning(self, mock_makedirs):
+        # When throttled is non-zero (undervoltage / throttling), PWR flag is pwrWARN
+        path = self.sm.generate_video_path(uptime_s=17.8, throttled_state="throttled=0x50005", seq=43)
+        expected_path = "/mnt/usb_storage/Wild_Life_Recordings/clip_00043_boot18s_pwrWARN.mp4"
+        self.assertEqual(path, expected_path)
+
+    @patch("os.makedirs")
+    def test_generate_video_path_diagnostic_format_default_args(self, mock_makedirs):
+        # Should gracefully handle missing/None uptime or throttled state
+        path = self.sm.generate_video_path(uptime_s=None, throttled_state=None, seq=1)
+        expected_path = "/mnt/usb_storage/Wild_Life_Recordings/clip_00001_boot0s_pwrOK.mp4"
+        self.assertEqual(path, expected_path)
+
+    def test_sequence_counter_persistence_and_increment(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmpdir:
+            seq_file = os.path.join(tmpdir, "test_seq.txt")
+            sm1 = StorageManager(mount_point=tmpdir, sequence_file=seq_file)
+            p1 = sm1.generate_video_path(uptime_s=15.0, throttled_state="throttled=0x0")
+            self.assertIn("clip_00001_boot15s_pwrOK.mp4", p1)
+
+            p2 = sm1.generate_video_path(uptime_s=16.0, throttled_state="throttled=0x0")
+            self.assertIn("clip_00002_boot16s_pwrOK.mp4", p2)
+
+            # Re-instantiating StorageManager should pick up the persisted sequence
+            sm2 = StorageManager(mount_point=tmpdir, sequence_file=seq_file)
+            p3 = sm2.generate_video_path(uptime_s=17.0, throttled_state="throttled=0x0")
+            self.assertIn("clip_00003_boot17s_pwrOK.mp4", p3)
+
+    def test_sequence_counter_fallback_scan_when_file_missing(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmpdir:
+            seq_file = os.path.join(tmpdir, "missing_seq.txt")
+            rec_dir = os.path.join(tmpdir, StorageManager.DEFAULT_DIR_NAME)
+            os.makedirs(rec_dir, exist_ok=True)
+            # Create existing clips in directory
+            with open(os.path.join(rec_dir, "clip_00007_boot12s_pwrOK.mp4"), "w") as f:
+                f.write("test")
+            with open(os.path.join(rec_dir, "clip_00012_boot14s_pwrWARN.mp4"), "w") as f:
+                f.write("test")
+
+            sm = StorageManager(mount_point=tmpdir, sequence_file=seq_file)
+            next_path = sm.generate_video_path(uptime_s=10.0, throttled_state="throttled=0x0")
+            # Next should be 13 (max 12 + 1)
+            self.assertIn("clip_00013_boot10s_pwrOK.mp4", next_path)
 
     @patch("os.path.isdir")
     @patch("os.path.exists")

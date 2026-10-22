@@ -10,6 +10,7 @@ import datetime
 import glob
 import logging
 import os
+import re
 import subprocess
 from typing import Optional
 
@@ -28,7 +29,8 @@ class StorageManager:
         self,
         mount_point: Optional[str] = None,
         directory_name: str = DEFAULT_DIR_NAME,
-        use_sd_card: Optional[bool] = None
+        use_sd_card: Optional[bool] = None,
+        sequence_file: Optional[str] = None,
     ):
         self.directory_name = directory_name
         self.mount_point = mount_point
@@ -39,6 +41,20 @@ class StorageManager:
         self.use_sd_card = bool(use_sd_card)
 
         self.recordings_dir = self.resolve_recordings_dir()
+        self.sequence_file = sequence_file or self.resolve_sequence_file_path()
+
+    def resolve_sequence_file_path(self) -> str:
+        """Determines the persistent path for the monotonic sequence counter."""
+        candidates = [
+            "/home/david/.squirrel_sequence",
+            "/var/lib/squirrelfeeder/sequence",
+        ]
+        for c in candidates:
+            parent = os.path.dirname(c)
+            if os.path.exists(parent) and os.path.isdir(parent) and os.access(parent, os.W_OK):
+                return c
+
+        return os.path.expanduser("~/.squirrel_sequence")
 
     def resolve_recordings_dir(self) -> str:
         """Determines the target directory for recordings.
@@ -155,11 +171,85 @@ class StorageManager:
 
         return True
 
-    def generate_video_path(self, timestamp: Optional[str] = None) -> str:
-        """Generates a standardized MP4 video file path within the recordings directory."""
-        if not timestamp:
-            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    def _get_next_sequence(self) -> int:
+        """Reads and increments the monotonic sequence counter.
 
+        Falls back to scanning existing files in recordings_dir if sequence_file does not exist.
+        """
+        current_seq = 0
+        if self.sequence_file and os.path.exists(self.sequence_file):
+            try:
+                with open(self.sequence_file, "r", encoding="utf-8") as f:
+                    content = f.read().strip()
+                    if content.isdigit():
+                        current_seq = int(content)
+            except OSError as e:
+                logger.warning(f"Failed to read sequence file {self.sequence_file}: {e}")
+
+        # Fallback to scanning existing clips if sequence file is missing or was 0
+        if current_seq == 0 and os.path.isdir(self.recordings_dir):
+            try:
+                found_numbers = []
+                for entry in os.scandir(self.recordings_dir):
+                    if entry.is_file():
+                        match = re.search(r"clip_(\d+)", entry.name)
+                        if match:
+                            found_numbers.append(int(match.group(1)))
+                if found_numbers:
+                    current_seq = max(found_numbers)
+            except OSError:
+                pass
+
+        next_seq = current_seq + 1
+
+        if self.sequence_file:
+            try:
+                os.makedirs(os.path.dirname(os.path.abspath(self.sequence_file)), exist_ok=True)
+                with open(self.sequence_file, "w", encoding="utf-8") as f:
+                    f.write(str(next_seq))
+            except OSError as e:
+                logger.warning(f"Failed to write sequence file {self.sequence_file}: {e}")
+
+        return next_seq
+
+    @staticmethod
+    def parse_throttled_flag(throttled_state: Optional[str]) -> str:
+        """Parses vcgencmd throttled state into pwrOK or pwrWARN.
+
+        Format from vcgencmd get_throttled is typically 'throttled=0x50005' or '0x0'.
+        Non-zero hex values indicate active or past undervoltage/throttling.
+        """
+        if not throttled_state:
+            return "pwrOK"
+        match = re.search(r"0x([0-9a-fA-F]+)", str(throttled_state))
+        if match:
+            try:
+                val = int(match.group(1), 16)
+                return "pwrWARN" if val > 0 else "pwrOK"
+            except ValueError:
+                pass
+        return "pwrOK"
+
+    def generate_video_path(
+        self,
+        uptime_s: Optional[float] = None,
+        throttled_state: Optional[str] = None,
+        seq: Optional[int] = None,
+    ) -> str:
+        """Generates a standardized MP4 video file path with monotonic sequence and cycle diagnostics.
+
+        Format:
+            clip_{SEQ:05d}_boot{UPTIME}s_{PWR}.mp4
+        Example:
+            clip_00042_boot16s_pwrOK.mp4
+        """
+        if seq is None:
+            seq = self._get_next_sequence()
+
+        uptime_int = int(round(uptime_s)) if uptime_s is not None else 0
+        pwr_flag = self.parse_throttled_flag(throttled_state)
+
+        filename = f"clip_{seq:05d}_boot{uptime_int}s_{pwr_flag}.mp4"
         os.makedirs(self.recordings_dir, exist_ok=True)
-        return os.path.join(self.recordings_dir, f"clip_{timestamp}.mp4")
+        return os.path.join(self.recordings_dir, filename)
 

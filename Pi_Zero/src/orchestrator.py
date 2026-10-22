@@ -197,7 +197,11 @@ class MediaOrchestrator:
         # 2. Record Video
         success = False
         try:
-            video_path = self.storage_manager.generate_video_path()
+            throttled_state = get_throttled_state()
+            video_path = self.storage_manager.generate_video_path(
+                uptime_s=initial_uptime,
+                throttled_state=throttled_state
+            )
             logger.info(f"Target recording path: {video_path}")
             self.camera_service.record_video(video_path)
             logger.info("Video recording completed successfully.")
