@@ -277,6 +277,15 @@ class TestFetchAndWatch(unittest.TestCase):
         self.assertEqual(diag_legacy["boot"], "N/A")
         self.assertEqual(diag_legacy["power"], "N/A")
 
+    @patch("Pi_Zero.scripts.visualize_metrics.generate_dashboard_from_dir")
+    @patch("sys.argv", ["fetch_and_watch.py", "--visualize", "--no-fetch", "--no-open"])
+    def test_main_visualize_flag(self, mock_gen_dashboard):
+        from Pi_Zero.scripts.fetch_and_watch import main
+        mock_gen_dashboard.return_value = "/path/to/metrics_dashboard.html"
+        main()
+        mock_gen_dashboard.assert_called_once()
+
 
 if __name__ == "__main__":
     unittest.main()
+

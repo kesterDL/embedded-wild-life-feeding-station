@@ -552,3 +552,23 @@ python3 Pi_Zero/scripts/fetch_and_watch.py
 # Or fetch from a custom remote folder
 python3 Pi_Zero/scripts/fetch_and_watch.py --remote-dir SquirrelFeeder/Wild_Life_Recordings
 ```
+
+---
+
+### 6.6 Visualizing Performance, Brownout & Lifecycle Metrics
+
+The system includes an offline-first, interactive HTML metrics dashboard for tracking start-up latency, supply rail brownouts (`vcgencmd get_throttled`), cycle timing breakdowns, reliability rates, and file payloads.
+
+For full architectural details, see [Diagnostics, Telemetry & Visualization Architecture](file:///Users/davidkester/Workspace/SquirrelFeeder/Design_Docs/Diagnostics_and_Metrics.md).
+
+```bash
+# Generate and open dashboard in your default browser:
+python3 Pi_Zero/scripts/visualize_metrics.py --open
+
+# Or pull recordings and launch dashboard in one command:
+python3 Pi_Zero/scripts/fetch_and_watch.py --pull --visualize
+
+# View dashboard from existing local recordings without pulling:
+python3 Pi_Zero/scripts/fetch_and_watch.py --visualize
+```
+

@@ -32,6 +32,8 @@ RECORDINGS_DIR_NAME = "Wild_Life_Recordings"
 
 # Determine repository root
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
+if REPO_ROOT not in sys.path:
+    sys.path.insert(0, REPO_ROOT)
 DEFAULT_LOCAL_DIR = os.path.join(REPO_ROOT, RECORDINGS_DIR_NAME)
 
 
@@ -556,6 +558,12 @@ def main():
         default=True,
         help="Keep source recordings in Wild_Life_Recordings after transferring (default: delete confirmed transferred files)."
     )
+    parser.add_argument(
+        "--visualize", "--dashboard",
+        dest="visualize",
+        action="store_true",
+        help="Generate and view an interactive metrics dashboard HTML report from lifecycle.log."
+    )
 
     args = parser.parse_args()
 
@@ -592,7 +600,7 @@ def main():
         active_dir = sd_card_dir
     else:
         active_dir = local_dir
-        if not args.no_fetch and not args.list:
+        if not args.no_fetch and not args.list and not args.visualize:
             fetch_from_pi(
                 host=args.host, dest_dir=local_dir, remote_dir=args.remote_dir, delete_source=args.delete_source, sync_log=True
             )
@@ -607,6 +615,16 @@ def main():
         search_dirs.append(REPO_ROOT)
 
     candidates = get_candidate_files(search_dirs, include_temp=True)
+
+    if args.visualize:
+        from Pi_Zero.scripts.visualize_metrics import generate_dashboard_from_dir
+        dashboard_path = generate_dashboard_from_dir(
+            recordings_dir=active_dir or local_dir,
+            open_browser=not args.no_open
+        )
+        print(f"✓ Metrics dashboard generated at: {dashboard_path}")
+        if not args.sync and not args.file and not args.list:
+            return
 
     if args.list:
         list_recordings(candidates)
